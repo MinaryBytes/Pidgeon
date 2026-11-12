@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide — Pidgeon</title>
+<meta name="description" content="How to draw, check and export PFDs, P&IDs and single-use assembly drawings with Pidgeon.">
+<link rel="icon" href="assets/pidgeon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<meta property="og:title" content="Pidgeon — process diagrams for pharma">
+<meta property="og:description" content="Free, open-source editor for PFDs, P&amp;IDs and single-use assembly drawings. Runs in your browser; nothing is uploaded.">
+<meta property="og:image" content="assets/app-pid.webp">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="frame">
+<div class="zones-x" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div><div class="zones-y" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+<header class="top">
+  <a class="brand" href="./"><svg viewBox="0 0 32 32" fill="none" stroke="#0F766E" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="20" cy="9" r="5"/><path d="M15 9h10"/><path d="M25 7.5l4 2.5-4 1.5"/><path d="M17 13.5C10 15 5 20 4 27h17c3-3.5 3-9.5-1.5-13"/><path d="M9 21h9"/><path d="M11 27v3M16 27v3"/></svg>Pidgeon</a>
+  <nav class="links" aria-label="Main">
+    <a href="guide.html">Guide</a>
+    <a href="https://github.com/MinaryBytes/pidgeon">Source code</a>
+    <a class="btn go" href="app/">Open the editor</a>
+  </nav>
+</header>
+<main id="main" class="guide">
+<nav class="toc" aria-label="Guide contents">
+  <a href="#start">Getting started</a>
+  <a href="#draw">Drawing basics</a>
+  <a href="#pfd">Process flow diagrams</a>
+  <a href="#pid">P&amp;IDs</a>
+  <a href="#su">Single-use assemblies</a>
+  <a href="#sheets">Sheets</a>
+  <a href="#export">Saving and exporting</a>
+  <a href="#reports">Lists and drawing check</a>
+  <a href="#keys">Keyboard shortcuts</a>
+  <a href="#custom">Changing the conventions</a>
+</nav>
+<article>
+<h1>Pidgeon guide</h1>
+<p class="lede">Everything you need to draw, check and export a diagram. Ten minutes, start to finish.</p>
+
+<h2 id="start">Getting started</h2>
+<ol>
+  <li><a href="app/">Open the editor</a>. It loads an example process; use <b>New</b> or <b>Templates</b> to start your own.</li>
+  <li>Choose the drawing <b>Type</b> in the toolbar: PFD, P&amp;ID or SU assembly. The symbol palette, default line and title block follow your choice.</li>
+  <li>Your work saves itself in this browser. To keep a copy or move it to another computer, use <b>Save &amp; export → Save diagram (.json)</b>, then <b>Open</b> it elsewhere.</li>
+</ol>
+
+<h2 id="draw">Drawing basics</h2>
+<ul>
+  <li><b>Add a symbol:</b> drag it from the palette on the left, or click it to drop it in the middle of the view. Search the palette by name, for example <i>column</i> or <i>lyo</i>.</li>
+  <li><b>Connect:</b> hover a shape to show its connection points, then drag from one to another shape. Larger shapes have extra, smaller points that act as nozzles.</li>
+  <li><b>Put a part into a line:</b> drop a valve, fitting, filter or inline instrument onto an existing line. The line splits and the part turns to follow the flow. This also works for an unconnected part already on the drawing.</li>
+  <li><b>Branch a line:</b> drop a <i>Junction / tee</i> onto it, then draw from its free side.</li>
+  <li><b>Edit text:</b> double-click a shape or line. Everything else is in the panel on the right.</li>
+  <li><b>Rotate</b> with <kbd>R</kbd>. Connected lines stay attached.</li>
+  <li><b>Connection markers</b> such as Tri-Clamp, weld or aseptic connector go <i>on</i> a line: drag one from the palette near a line end to mark that end, or onto the middle for an inline joint. Turn on <b>Sizes</b> to show their sizes.</li>
+</ul>
+
+<h2 id="pfd">Process flow diagrams</h2>
+<p>Use the unit-operation symbols for upstream, harvest, purification, fill–finish and oral solid dose. Add <b>Cleanroom zones</b> (EU GMP Annex 1 grades) behind equipment, and tick <b>Single-use component</b> on anything disposable to show the SU badge. The legend lists only the line types and markers you used.</p>
+
+<h2 id="pid">P&amp;IDs</h2>
+<h3>Instruments</h3>
+<p>Type the tag as letters and loop number, for example <code>PIT 201</code>. In the panel, choose where the function is implemented (discrete, DCS, computer or PLC) and where it is accessed (field, control room, local panel, behind panel); the symbol changes to match ISA-5.1. Control and on/off valves carry a fail position.</p>
+<h3>Lines</h3>
+<p>Select a line to fill in size, service, line number, pipe class and insulation. The tag, such as <code>1.5"-WFI-1001-SS-BPE-SF4</code>, appears once per line number when <b>Tags</b> is on. <b>Auto-number line</b> gives the next free number. Nozzle IDs (N1, N2…) go on each end.</p>
+<h3>Equipment</h3>
+<p>Volume, material, design pressure and temperature are under <b>Equipment design data</b>, and appear on the drawing if you choose to show them.</p>
+
+<h2 id="su">Single-use assemblies</h2>
+<p>Draw the assembly with bags, fittings, clamps and connectors, then select each tubing run to enter material, ID, OD and length. Place an <b>Assembly boundary</b> around the parts with its part number and sterilization method, and add a <b>Bill of materials</b>: it counts everything inside the boundary, groups connectors by size and totals tubing length by material and size.</p>
+
+<h2 id="sheets">Sheets</h2>
+<p>Use <b>＋ Sheet</b> at the bottom of the canvas to add a sheet; the title block comes with it. The <b>⋯</b> menu on the current tab renames, duplicates, reorders or deletes it. To continue a line onto another sheet, select an <i>Off-page connector</i>, choose the sheet it continues on and click <b>Create matching connector</b>. Each connector then shows where it leads, and <b>Go to sheet</b> jumps there.</p>
+
+<h2 id="export">Saving and exporting</h2>
+<table>
+  <tr><th>PDF</th><td>Vector, one page per sheet. Choose A3, A4, 11 × 17, Letter or fit to drawing.</td></tr>
+  <tr><th>DXF</th><td>AutoCAD R12, one file per sheet, millimetres (1 px = 0.265 mm). Layers by object type, CAD colours and linetypes.</td></tr>
+  <tr><th>PNG / SVG</th><td>The current sheet as an image. SVG pastes into Visio, PowerPoint and Word.</td></tr>
+  <tr><th>JSON</th><td>The editable drawing, all sheets. Reopen it with <b>Open</b>.</td></tr>
+</table>
+
+<h2 id="reports">Lists and drawing check</h2>
+<p><b>Reports</b> exports the equipment list, line list, instrument index, valve list, connection schedule and bill of materials as CSV files that open in Excel. The drawing check above them lists problems such as duplicate tags, valves connected on one side only, lines missing data and unlinked off-page connectors; click one to go to it.</p>
+
+<h2 id="keys">Keyboard shortcuts</h2>
+<table>
+  <tr><td><kbd>Delete</kbd></td><td>Delete selection</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>V</kbd> / <kbd>D</kbd></td><td>Copy / paste / duplicate</td></tr>
+  <tr><td><kbd>R</kbd></td><td>Rotate 90°</td></tr>
+  <tr><td><kbd>F</kbd></td><td>Fit drawing to screen</td></tr>
+  <tr><td><kbd>Space</kbd> + drag, or scroll</td><td>Pan</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + scroll</td><td>Zoom</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Previous / next sheet</td></tr>
+  <tr><td><kbd>Enter</kbd> or double-click</td><td>Edit text</td></tr>
+  <tr><td>Arrow keys (+ <kbd>Shift</kbd>)</td><td>Nudge 10 px (50 px)</td></tr>
+</table>
+
+<h2 id="custom">Changing the conventions</h2>
+<p>The service codes, pipe classes, insulation codes and tag prefixes are short lists near the top of <code>app/index.html</code> (<code>SERVICES</code>, <code>SPECS</code>, <code>INSUL</code> and each symbol's <code>prefix</code>). Edit them to match your site standard and host your own copy; it is a static page, so any web server or a shared drive will do.</p>
+<p class="note"><strong>Not validated software.</strong> Treat drawings as drafts until they are issued through your controlled document system.</p>
+</article>
+</main>
+<footer class="titleblock">
+  <div><span class="k">Title</span><span class="v">Pidgeon — process diagram editor</span></div>
+  <div><span class="k">Licence</span><span class="v"><a href="LICENSE">MIT</a></span></div>
+  <div><span class="k">Source and issues</span><span class="v"><a href="https://github.com/MinaryBytes/pidgeon">github.com/MinaryBytes/pidgeon</a></span></div>
+  <div><span class="k">Version</span><span class="v">1.0, November 2026</span></div>
+  <div class="wide">Not validated software. Drawings made with Pidgeon are drafts until issued through your own controlled document system. Independent open-source project; not affiliated with any pharmaceutical company or software vendor. Third-party components are listed in <a href="NOTICE.md">NOTICE</a>.</div>
+</footer>
+</div>
+</body>
+</html>
