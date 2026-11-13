@@ -56,6 +56,7 @@ header select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;bac
 .ehit{cursor:pointer}
 .handle{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:nwse-resize}
 .eend{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:crosshair}
+.seg{fill:var(--sel);stroke:#fff;stroke-width:1.2}.seg.h{cursor:ns-resize}.seg.v{cursor:ew-resize}.seg:hover{fill:#0369a1}
 .layerbar{position:relative}.layerbar+.stepbar{margin-left:6px}
 .lbtn{border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;color:#334155}.lbtn b{color:var(--accent)}
 .lpop{position:fixed;min-width:240px;max-height:60vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);padding:6px;z-index:20;font-weight:500;color:#1f2937}
@@ -753,7 +754,57 @@ function orth(p1, d1, p2, d2) {
 function route(e) {
   const a = byId(e.from.node), b = byId(e.to.node);
   if (!a || !b) return null;
-  return orth(portPos(a, e.from.port), e.from.port, portPos(b, e.to.port), e.to.port);
+  const p1 = portPos(a, e.from.port), p2 = portPos(b, e.to.port);
+  return e.via && e.via.length ? simplify(fullRoute(e, p1, p2)) : orth(p1, e.from.port, p2, e.to.port);
+}
+/* Reshaped lines: e.via holds the user's bend points between the two port stubs. The full path is
+   port → stub → bends → stub → port, with an elbow added wherever two neighbours are no longer square
+   (e.g. after a shape was moved), so the line always stays orthogonal. */
+const STUB_LEN = 18;
+function stubOf(p, port) { const [dx, dy] = DIRS[port[0]]; return [p[0] + dx * STUB_LEN, p[1] + dy * STUB_LEN]; }
+function squareUp(pts) {
+  const o = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const P = o[o.length - 1], Q = pts[i];
+    if (Math.abs(P[0] - Q[0]) > .5 && Math.abs(P[1] - Q[1]) > .5) {
+      const R = o[o.length - 2], prevH = R ? Math.abs(R[1] - P[1]) < .5 : true;
+      o.push(prevH ? [Q[0], P[1]] : [P[0], Q[1]]);
+    }
+    o.push(Q);
+  }
+  return o;
+}
+function fullRoute(e, p1, p2) { return squareUp([p1, stubOf(p1, e.from.port), ...e.via.map(v => [v[0], v[1]]), stubOf(p2, e.to.port), p2]); }
+// Unsimplified path used for dragging segments (stubs kept explicit so ports never move)
+function editRoute(e) {
+  const a = byId(e.from.node), b = byId(e.to.node), r = route(e); if (!r) return [];
+  const s1 = stubOf(portPos(a, e.from.port), e.from.port), s2 = stubOf(portPos(b, e.to.port), e.to.port), o = r.map(p => [p[0], p[1]]);
+  // put back the stub ends that simplify() merged into longer runs, so ports never move while dragging
+  if (o.length > 1 && !near(o[1], s1)) o.splice(1, 0, s1);
+  if (o.length > 2 && !near(o[o.length - 2], s2)) o.splice(o.length - 1, 0, s2);
+  return dedupe(o);
+}
+const near = (p, q) => Math.abs(p[0] - q[0]) < .5 && Math.abs(p[1] - q[1]) < .5;
+function dedupe(pts) { const o = []; for (const p of pts) if (!o.length || !near(o[o.length - 1], p)) o.push(p); return o; }
+// Move segment j (between pts[j] and pts[j+1]) to a new perpendicular position; stubs stay put by adding bends
+// After a drag, keep only the bends that matter (the simplified path between the two stubs)
+function viaFrom(e, r) {
+  const a = byId(e.from.node), b = byId(e.to.node), s1 = stubOf(portPos(a, e.from.port), e.from.port), s2 = stubOf(portPos(b, e.to.port), e.to.port);
+  const inner = r.slice(1, -1).filter(p => !near(p, s1) && !near(p, s2));
+  // if the path no longer leaves straight through its stubs, keep the stub ends as bends too
+  return inner.length ? inner : [];
+}
+function shiftVias(ids, dx, dy) { for (const e of doc.edges) if (e.via && ids.has(e.from.node) && ids.has(e.to.node)) e.via = e.via.map(([x, y]) => [x + dx, y + dy]); }
+function moveSegment(pts, j, c) {
+  const P = pts[j], Q = pts[j + 1], horiz = Math.abs(P[1] - Q[1]) < .5, ax = horiz ? 1 : 0;
+  const out = pts.map(p => [p[0], p[1]]);
+  const np = p => { const r = [p[0], p[1]]; r[ax] = c; return r; };
+  // Points 0,1 and n-2,n-1 are the ports and stub ends: never move them, add a bend instead
+  const last = out.length - 1;
+  let A = j, B = j + 1;
+  if (A <= 1) { out.splice(A + 1, 0, np(out[A])); B++; } else out[A] = np(out[A]);
+  if (B >= last - 1) out.splice(B, 0, np(out[B])); else out[B] = np(out[B]);
+  return out;
 }
 function midpoint(pts) {
   let L = 0; const seg = [];
@@ -1067,8 +1118,14 @@ function edgeSVG(e, exp, H, pts, tagText = '') {
     const m = midpoint(pts), tw = e.label.length * 6.1 + 12;
     o += `<rect x="${m[0]-tw/2}" y="${m[1]-9}" width="${tw}" height="18" rx="3" fill="#fff" stroke="${L.color}" stroke-width=".8"/>` + T(m[0], m[1]+4, e.label, {size:10, weight:500, fill:L.color === INK ? INK : L.color});
   }
-  if (isSel && sel.size === 1) {
+  if (isSel && sel.size === 1 && !exp) {
     const a = pts[0], b = pts[pts.length-1];
+    const ep = editRoute(e);
+    for (let j = 1; j < ep.length - 2; j++) {
+      const P = ep[j], Q = ep[j + 1], len = Math.hypot(Q[0] - P[0], Q[1] - P[1]); if (len < 14) continue;
+      const horiz = Math.abs(P[1] - Q[1]) < .5, mx = (P[0] + Q[0]) / 2, my = (P[1] + Q[1]) / 2;
+      o += `<rect class="seg ${horiz ? 'h' : 'v'}" data-seg="${e.id}:${j}" x="${mx - (horiz ? 9 : 3.5)}" y="${my - (horiz ? 3.5 : 9)}" width="${horiz ? 18 : 7}" height="${horiz ? 7 : 18}" rx="3.5"/>`;
+    }
     o += `<circle class="eend" data-eend="${e.id}:from" cx="${a[0]}" cy="${a[1]}" r="5"/><circle class="eend" data-eend="${e.id}:to" cx="${b[0]}" cy="${b[1]}" r="5"/>`;
   }
   return o + '</g>';
@@ -1364,8 +1421,8 @@ function insertInline(n, x, y) {
   const [ix, iy] = portPos({x:0, y:0, w:n.w, h:n.h}, pin), [ox, oy] = portPos({x:0, y:0, w:n.w, h:n.h}, pout);
   n.x = Math.round(px - (ix + ox) / 2); n.y = Math.round(py - (iy + oy) / 2);
   const arr = e.arrow || 'end';
-  const e1 = {...e, id:uid(), to:{node:n.id, port:pin}, cTo:undefined, cToSize:undefined, toNoz:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'start' || arr === 'both' ? 'start' : 'none'};
-  const e2 = {...e, id:uid(), from:{node:n.id, port:pout}, cFrom:undefined, cFromSize:undefined, fromNoz:undefined, label:'', cMid:undefined, cMidSize:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'end' || arr === 'both' ? 'end' : 'none'};
+  const e1 = {...e, via:undefined, id:uid(), to:{node:n.id, port:pin}, cTo:undefined, cToSize:undefined, toNoz:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'start' || arr === 'both' ? 'start' : 'none'};
+  const e2 = {...e, via:undefined, id:uid(), from:{node:n.id, port:pout}, cFrom:undefined, cFromSize:undefined, fromNoz:undefined, label:'', cMid:undefined, cMidSize:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'end' || arr === 'both' ? 'end' : 'none'};
   doc.edges.splice(doc.edges.indexOf(e), 1, e1, e2);
   return true;
 }
@@ -1411,6 +1468,7 @@ function paste() {
   for (const c of nodes) if (SYM[c.type].prefix && !c.tag) { doc.nodes.push(c); c.tag = nextTag(SYM[c.type].prefix); doc.nodes.pop(); }
   const edges = clip.edges.map(e => ({...JSON.parse(JSON.stringify(e)), id:uid(), from:{...e.from, node:map[e.from.node]}, to:{...e.to, node:map[e.to.node]}}));
   doc.nodes.push(...nodes); doc.edges.push(...edges);
+  for (const e of edges) if (e.via) e.via = e.via.map(([x, y]) => [x + off, y + off]);
   sel = new Set([...nodes.map(n => n.id), ...edges.map(e => e.id)]);
   commit(); renderProps();
 }
@@ -1474,6 +1532,12 @@ svg.addEventListener('pointerdown', ev => {
     drag = {mode:'connect', from:{node:id, port:p}, cur:w, type:settings.line};
     svg.classList.add('connecting'); svg.setPointerCapture(ev.pointerId); render(); return;
   }
+  const segEl = t.closest('[data-seg]');
+  if (segEl) {
+    const [id, j] = segEl.dataset.seg.split(':'), e = edgeById(id), pts = editRoute(e), P = pts[+j], Q = pts[+j + 1];
+    drag = {mode:'seg', id, j:+j, pts, horiz: Math.abs(P[1] - Q[1]) < .5, moved:false};
+    svg.setPointerCapture(ev.pointerId); return;
+  }
   const endEl = t.closest('[data-eend]');
   if (endEl) {
     const [id, end] = endEl.dataset.eend.split(':'), e = edgeById(id);
@@ -1493,7 +1557,10 @@ svg.addEventListener('pointerdown', ev => {
     else clickSelect = id;
     const orig = {};
     for (const n of doc.nodes) if (sel.has(n.id)) orig[n.id] = [n.x, n.y];
-    drag = {mode:'move', start:w, orig, moved:false, clickSelect};
+    // Reshaped lines between two moving shapes travel with them
+    const origVia = {};
+    for (const e of doc.edges) if (e.via && orig[e.from.node] && orig[e.to.node]) origVia[e.id] = e.via.map(p => [...p]);
+    drag = {mode:'move', start:w, orig, origVia, moved:false, clickSelect};
     svg.setPointerCapture(ev.pointerId); render(); renderProps(); return;
   }
   const eEl = t.closest('[data-edge]');
@@ -1523,6 +1590,7 @@ svg.addEventListener('pointermove', ev => {
     drag.guides = [];
     if (settings.guides !== false && !ev.altKey) { const g = smartGuides(ids0, mx, my); mx = g.dx; my = g.dy; drag.guides = g.lines; }
     for (const [id, [ox, oy]] of Object.entries(drag.orig)) { const n = byId(id); n.x = ox + mx; n.y = oy + my; }
+    for (const [id, v] of Object.entries(drag.origVia || {})) { const e = edgeById(id); if (e) e.via = v.map(([x, y]) => [x + mx, y + my]); }
     // A single, unconnected inline part dragged over a line gets inserted into it on drop
     drag.target = null;
     const ids = Object.keys(drag.orig);
@@ -1539,6 +1607,12 @@ svg.addEventListener('pointermove', ev => {
     const n = byId(drag.id); n.w = Math.max(40, snap(drag.ow + w.x - drag.start.x)); n.h = Math.max(24, snap(drag.oh + w.y - drag.start.y)); render(); return;
   }
   if (drag.mode === 'connect') { drag.cur = w; render(); return; }
+  if (drag.mode === 'seg') {
+    const e = edgeById(drag.id), c = snap(drag.horiz ? w.y : w.x);
+    const np = moveSegment(drag.pts, drag.j, c);
+    e.via = np.slice(2, -2).map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
+    drag.moved = true; render(); return;
+  }
   if (drag.mode === 'marquee') {
     drag.cur = w;
     const x1 = Math.min(drag.start.x, w.x), x2 = Math.max(drag.start.x, w.x), y1 = Math.min(drag.start.y, w.y), y2 = Math.max(drag.start.y, w.y);
@@ -1559,11 +1633,12 @@ function endDrag(ev) {
     }
     if (d.moved) commit(); else if (d.clickSelect) { sel = new Set([d.clickSelect]); render(); renderProps(); } }
   else if (d.mode === 'resize') commit();
+  else if (d.mode === 'seg') { if (d.moved) { const e = edgeById(d.id); const r = route(e); e.via = r && r.length > 4 ? viaFrom(e, r) : undefined; if (!e.via || !e.via.length) delete e.via; commit(); renderProps(); } }
   else if (d.mode === 'connect') {
     const t = nodeAt(d.cur.x, d.cur.y, d.from.node);
     if (t) {
       const port = nearestPort(t, d.cur.x, d.cur.y);
-      if (d.reconnect) { const e = edgeById(d.reconnect.id); e[d.reconnect.end] = {node:t.id, port}; sel = new Set([e.id]); }
+      if (d.reconnect) { const e = edgeById(d.reconnect.id); e[d.reconnect.end] = {node:t.id, port}; delete e.via; sel = new Set([e.id]); }
       else {
         const e = {id:uid(), from:d.from, to:{node:t.id, port}, type:settings.line, label:'', arrow: LINES[settings.line].sig ? 'none' : 'end'};
         if (doc.mode === 'pid' && !LINES[e.type].sig) { e.lineNo = nextLineNo(); e.service = DEF_SERVICE[e.type] || 'PR'; }
@@ -1649,7 +1724,7 @@ document.addEventListener('keydown', ev => {
     const ns = doc.nodes.filter(n => sel.has(n.id)); if (!ns.length) return;
     ev.preventDefault(); const st = ev.shiftKey ? GRID*5 : GRID;
     const [dx, dy] = {ArrowLeft:[-st,0], ArrowRight:[st,0], ArrowUp:[0,-st], ArrowDown:[0,st]}[ev.key];
-    ns.forEach(n => { n.x += dx; n.y += dy; }); commit();
+    ns.forEach(n => { n.x += dx; n.y += dy; }); shiftVias(new Set(ns.map(n => n.id)), dx, dy); commit();
   }
 });
 document.addEventListener('keyup', ev => { if (ev.key === ' ') { spaceDown = false; svg.classList.remove('space'); } });
@@ -1794,7 +1869,7 @@ function renderProps() {
         field('Layout', check('id="sGuides"', settings.guides !== false, 'Smart guides while dragging (hold Alt to ignore)') + `<div class="btns"><button class="btn" data-act="tidy" title="Straighten nearly-straight lines and line up near-aligned shapes (Shift+T)">Tidy up drawing</button></div>`) +
         layersEditor() + stepsEditor() +
       field('Line type for new connections', lineTypeRows(settings.line, 'data-defline')) +
-      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — right-drag (or <kbd>Space</kbd>+drag). <b>Zoom</b> — scroll.<br><b>Tidy</b> — <kbd>Shift</kbd>+<kbd>T</kbd> straightens lines; pink guides help line shapes up while dragging (hold <kbd>Alt</kbd> to ignore).</div>`;
+      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Reshape a line</b> — select it and drag the handles on its segments.<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — right-drag (or <kbd>Space</kbd>+drag). <b>Zoom</b> — scroll.<br><b>Tidy</b> — <kbd>Shift</kbd>+<kbd>T</kbd> straightens lines; pink guides help line shapes up while dragging (hold <kbd>Alt</kbd> to ignore).</div>`;
   } else if (nodes.length === 1 && !edges.length) {
     const n = nodes[0], s = SYM[n.type];
     h = `<h3>${esc(s.name)}</h3><div class="sub">${esc(s.cat)}</div>`;
@@ -1848,6 +1923,7 @@ function renderProps() {
     h = `<h3>Line</h3><div class="sub">${esc(nm(a))} → ${esc(nm(b))}${lineTag(e) ? ' · ' + esc(lineTag(e)) : ''}</div>` + allDatalists() +
       field('Stream label', `<input data-e="label" value="${esc(e.label)}" placeholder="e.g. Clarified harvest">`) +
       arrowRow(e.arrow || 'end') +
+      (e.via ? field('Shape', `<div class="btns" style="margin:0"><button class="btn" data-act="reroute" title="Go back to the automatic route">Reset to automatic route</button></div>`) : `<p class="note" style="margin:-4px 0 10px">Drag the small handles on the line's segments to reshape it.</p>`) +
       sect(`Line type — ${esc(LINES[e.type]?.name || '')}`, lineTypeRows(e.type, 'data-etype'), mode === 'pfd') +
       (sig ? '' : sect('Line data (P&amp;ID)',
         `<div class="row2">${field('Size', inp('data-e="size"', e.size, '1.5"', 'dl-pipe'))}${field('Service', inp('data-e="service"', e.service, 'WFI', 'dl-svc'))}</div>` +
@@ -1980,6 +2056,7 @@ P.addEventListener('click', ev => {
   if (t.dataset.etype) { for (const id of items) { const e = edgeById(id); if (e) e.type = t.dataset.etype; } commit(); renderProps(); return; }
   const a = t.dataset.act;
   if (a === 'tidy') { tidyUp(); return; }
+  if (a === 'reroute') { for (const id of items) { const e = edgeById(id); if (e) delete e.via; } commit(); renderProps(); return; }
   if (a && a.startsWith('step')) { stepAction(a); return; }
   if (a && a.startsWith('lay')) { layerAction(a); return; }
   if (a === 'del') deleteSel();
@@ -2833,7 +2910,7 @@ function openTemplates(isNew) {
   });
 }
 function openHelp() {
-  const rows = [['Drag symbol → canvas','Add shape'],['Drop valve / fitting on a line','Insert it inline (splits the line)'],['R','Rotate 90°'],['Drag from blue port','Connect two shapes'],['Double-click / Enter','Edit label'],['Drag empty canvas','Box-select'],['Shift + click','Add to selection'],['Right-drag (or Space + drag)','Pan'],['Scroll / pinch','Zoom'],['Shift + scroll','Pan sideways'],['Shift + T','Tidy up (selection or whole sheet)'],['Alt while dragging','Ignore smart guides'],['F','Fit diagram to screen'],['Delete','Delete selection'],['Ctrl + C / V / D','Copy / paste / duplicate'],['Ctrl + Z / Y','Undo / redo'],['Arrow keys (+Shift)','Nudge 10 px (50 px)'],['Ctrl + S','Save & export']];
+  const rows = [['Drag symbol → canvas','Add shape'],['Drop valve / fitting on a line','Insert it inline (splits the line)'],['R','Rotate 90°'],['Drag from blue port','Connect two shapes'],['Drag a handle on a selected line','Reshape the line (Reset in the panel undoes it)'],['Double-click / Enter','Edit label'],['Drag empty canvas','Box-select'],['Shift + click','Add to selection'],['Right-drag (or Space + drag)','Pan'],['Scroll / pinch','Zoom'],['Shift + scroll','Pan sideways'],['Shift + T','Tidy up (selection or whole sheet)'],['Alt while dragging','Ignore smart guides'],['F','Fit diagram to screen'],['Delete','Delete selection'],['Ctrl + C / V / D','Copy / paste / duplicate'],['Ctrl + Z / Y','Undo / redo'],['Arrow keys (+Shift)','Nudge 10 px (50 px)'],['Ctrl + S','Save & export']];
   openModal('Keyboard & mouse', `<table class="keys">${rows.map(([a,b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table><p class="note">Line types follow common PFD conventions: solid = process stream, solid cyan = single-use tubing (closed SU flowpath), dashed blue = utility, dash-dot teal = CIP/SIP, long-dash purple = manual or mobile-vessel transfer, brown = waste, dotted grey = control signal. Cleanroom zones use EU GMP Annex 1 grades.</p><p class="note"><b>Pidgeon</b> is created by Minhazuddin Mohammed (MinaryBytes) and is free and open source under the MIT licence. It runs entirely in your browser: drawings are stored on this device and in the files you save, never uploaded. It is not validated for GMP use — treat drawings as drafts until issued through your controlled document system. Source code and issues: <a href="${REPO_URL}" target="_blank" rel="noopener">${REPO_URL.replace('https://', '')}</a></p>`);
 }
 
