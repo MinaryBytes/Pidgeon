@@ -314,6 +314,12 @@ const FILLS = ['#ffffff','#e0f2fe','#dcfce7','#fef9c3','#fee2e2','#ede9fe','#f1f
 const S = (id, cat, name, w, h, svg, o = {}) => ({id, cat, name, w, h, svg, text:'below', label:name, prefix:'', kw:'', ...o});
 const vessel = (w, h, t = 6) => `<path d="M${t},${t+10} Q${t},${t} ${w/2},${t} Q${w-t},${t} ${w-t},${t+10} V${h-t-10} Q${w-t},${h-t} ${w/2},${h-t} Q${t},${h-t} ${t},${h-t-10} Z"/>`;
 
+// Depth filter formats (both single-use): flat-plate pods in a holder, or a lenticular capsule of stacked cells
+const DF_POD = `<rect x="4" y="8" width="56" height="64" rx="3"/><path d="M4,16 H60 M4,64 H60" fill="none"/><path d="M14,16 V64 M22,16 V64 M30,16 V64 M38,16 V64 M46,16 V64 M54,16 V64" fill="none" stroke-width="1"/><path d="M32,8 V2 M32,72 V78" fill="none"/>`;
+const DF_LENS = `<path d="M8,20 Q8,8 32,8 Q56,8 56,20 V60 Q56,72 32,72 Q8,72 8,60 Z"/><path d="M32,15 V65" fill="none" stroke-width=".8" stroke-dasharray="2 1.5"/>` +
+  [22, 29.2, 36.4, 43.6, 50.8, 58].map(y => `<ellipse cx="32" cy="${y}" rx="19" ry="3" fill="none" stroke-width="1"/>`).join('') + `<path d="M32,8 V2 M32,72 V78" fill="none"/>`;
+const DF_FMT = [['pod','Pod — flat-plate modules in a holder'],['lens','Lenticular capsule — stacked cells']];
+const typeName = n => SYM[n.type].name + (n.type === 'depth-filter' ? (n.fmt === 'lens' ? ' — lenticular capsule' : ' — pod') : '');
 const SYMBOLS = [
   // Upstream
   S('rocker','Upstream','Rocking bioreactor',100,64,
@@ -429,7 +435,8 @@ const SYMBOLS = [
     {prefix:'CF', label:'Centrifuge', kw:'harvest separator disc stack'}),
   S('depth-filter','Harvest & clarification','Depth filter',64,80,
     `<rect x="4" y="8" width="56" height="64" rx="3"/><path d="M4,16 H60 M4,64 H60" fill="none"/><path d="M14,16 V64 M22,16 V64 M30,16 V64 M38,16 V64 M46,16 V64 M54,16 V64" fill="none" stroke-width="1"/><path d="M32,8 V2 M32,72 V78" fill="none"/>`,
-    {prefix:'DF', label:'Depth filtration', kw:'clarification pod depth filter'}),
+    {prefix:'DF', label:'Depth filtration', su:true, kw:'clarification pod depth filter lenticular capsule stack millistak zeta plus clarisolve stax',
+     draw:n => n.fmt === 'lens' ? DF_LENS : DF_POD}),
   S('filter','Harvest & clarification','Sterile filter (0.2 µm)',36,70,
     `<rect x="6" y="8" width="24" height="54" rx="10"/><path d="M12,18 L24,24 L12,30 L24,36 L12,42 L24,48 L12,54" fill="none" stroke-width="1"/><path d="M18,8 V2 M18,62 V68" fill="none"/>`,
     {prefix:'FL', label:'0.2 µm filter', inline:'v', kw:'sterile filter capsule bioburden 0.2 micron 0.22'}),
@@ -772,7 +779,7 @@ function wavyD(pts, lead = 12, amp = 2.6, wave = 11) {
 }
 function lineSample(type, x1, y, x2) {
   const L = LINES[type];
-  if (L.wavy) return `<path d="${wavyD([[x1, y], [x2, y]], 6, 2.2, 9)}" fill="none" stroke="${L.color}" stroke-width="${L.w}" stroke-linejoin="round"/>`;
+  if (L.wavy) return `<path d="${wavyD([[x1, y], [x2, y]], 6, 2.2, 9)}" fill="none" stroke="${L.color}" stroke-width="${L.w}" stroke-linejoin="round" marker-end="url(#arr-${type})"/>`;
   return `<path d="M${x1},${y} H${x2}" fill="none" stroke="${L.color}" stroke-width="${L.w}" ${L.dash ? `stroke-dasharray="${L.dash}"` : ''} ${L.sig ? '' : `marker-end="url(#arr-${type})"`}/>` +
     (L.decor ? `<g transform="translate(${(x1 + x2) / 2},${y})" fill="none" stroke="${L.color}">${DECOR[L.decor]}</g>` : '');
 }
@@ -1344,7 +1351,7 @@ function endDrag(ev) {
       const port = nearestPort(t, d.cur.x, d.cur.y);
       if (d.reconnect) { const e = edgeById(d.reconnect.id); e[d.reconnect.end] = {node:t.id, port}; sel = new Set([e.id]); }
       else {
-        const e = {id:uid(), from:d.from, to:{node:t.id, port}, type:settings.line, label:'', arrow: LINES[settings.line].sig || (doc.mode === 'su' && settings.line === 'sutube') ? 'none' : 'end'};
+        const e = {id:uid(), from:d.from, to:{node:t.id, port}, type:settings.line, label:'', arrow: LINES[settings.line].sig ? 'none' : 'end'};
         if (doc.mode === 'pid' && !LINES[e.type].sig) { e.lineNo = nextLineNo(); e.service = DEF_SERVICE[e.type] || 'PR'; }
         doc.edges.push(e); sel = new Set([e.id]);
       }
@@ -1546,6 +1553,7 @@ function renderProps() {
     if (s.text === 'below' || n.type === 'box') h += check('data-su', n.su, `Single-use component ${suBadge(0,0).replace(/^<g[^>]*>/, '<svg width="20" height="13" style="vertical-align:middle"><g>').replace(/<\/g>$/, '</g></svg>')}`);
     if (n.type === 'zone') h += field('Classification', sel1('data-f="grade"', Object.keys(GRADES).map(g => [g, g === 'CNC' ? 'CNC (controlled not classified)' : 'Grade ' + g]), n.grade));
     if (n.type === 'instrument') h += field('Function implemented in', sel1('data-f="ikind"', IKIND, n.ikind || 'discrete')) + field('Location / access', sel1('data-f="iloc"', ILOC, n.iloc || 'main'));
+    if (n.type === 'depth-filter') h += field('Format', sel1('data-f="fmt"', DF_FMT, n.fmt || 'pod'));
     if (n.type === 'cv' || n.type === 'sov') h += field('Fail position', sel1('data-f="fail"', FAILS, n.fail || 'FC'));
     if (n.type === 'assembly') h += field('Assembly part number', inp('data-f="label"', n.label, 'ASM-1001')) + field('Description', inp('data-f="desc"', n.desc, 'e.g. 50 L buffer bag assembly')) + field('Sterilization', sel1('data-f="steril"', STERIL, n.steril || 'Gamma')) +
       `<p class="note">The BOM table counts parts, connectors and tubing inside assembly boundaries (or the whole drawing if there are none).</p>`;
@@ -1809,7 +1817,7 @@ function computeBOM() {
     const s = SYM[n.type]; if (!s || NO_PORTS.includes(n.type) || n.type === 'junction') continue;
     if (!(s.cls === 'part' || n.su)) continue;
     if (!inAsm(n.x + n.w/2, n.y + n.h/2)) continue;
-    add(s.name, n.detail || '', 1);
+    add(typeName(n), n.detail || '', 1);
   }
   for (const e of doc.edges) {
     const p = route(e); if (!p) continue; const m = midpoint(p);
@@ -1828,7 +1836,7 @@ const endName = (e, end) => { const n = byId(e[end].node), noz = end === 'from' 
 const lab = (arr, v) => (arr.find(a => a[0] === v) || [, v || ''])[1];
 const REPORTS = {
   equipment: {name:'Equipment list', rows: () => [['Tag','Description','Type','Single-use','Volume / capacity','Material','Design pressure','Design temperature','Spec / size'],
-    ...doc.nodes.filter(n => SYM[n.type] && isEquip(SYM[n.type])).map(n => [n.tag, String(n.label || '').replace(/\n/g, ' '), SYM[n.type].name, n.su ? 'Yes' : '', n.vol, n.moc, n.dp, n.dt, n.detail])]},
+    ...doc.nodes.filter(n => SYM[n.type] && isEquip(SYM[n.type])).map(n => [n.tag, String(n.label || '').replace(/\n/g, ' '), typeName(n), n.su ? 'Yes' : '', n.vol, n.moc, n.dp, n.dt, n.detail])]},
   lines: {name:'Line list', rows: () => {
     // Segments that share a line tag (a line split by inline valves/fittings) collapse to one row;
     // its ends are the nodes that only start or only finish a segment of that line.
@@ -2387,7 +2395,7 @@ function tplPID() {
 function tplSU() {
   const {d, mk, ln} = builder('50 L buffer bag assembly');
   Object.assign(d, {mode:'su', showLineData:true, showSizes:true});
-  const T = (m, i, o, l) => ({type:'sutube', arrow:'none', tubeMat:m, tubeId:i, tubeOd:o, tubeLen:l});
+  const T = (m, i, o, l) => ({type:'sutube', arrow:'end', tubeMat:m, tubeId:i, tubeOd:o, tubeLen:l});
   const bag = mk('bag', 520, 330, '50 L 2D bag', 'BG-1', {detail:'50 L, EVA/PE film, 4 ports'});
   const yw1 = bag.y + bag.h * .25, yw2 = bag.y + bag.h * .75, ye2 = yw2;
   // Fill line: aseptic connector -> pinch clamp -> bag (port w1)
@@ -2397,10 +2405,10 @@ function tplSU() {
   ln(pc1, bag, 'e', 'w1', 'sutube', '', {...T('TPE', '½"', '¾"', '24"'), cTo:'tie', cToSize:'½" HB'});
   // Sampling port (w2)
   const nfv = mkRot(d, 'su-nfv', 330, yw2, 270, {detail:'Female luer, swabable'});
-  ln(nfv, bag, 'e', 'w2', 'sutube', '', {...T('Platinum-cured silicone', '⅛"', '¼"', '6"'), cFrom:'luer', cFromSize:'Female luer', cTo:'tie', cToSize:'⅛" HB'});
+  ln(nfv, bag, 'e', 'w2', 'sutube', '', {...T('Platinum-cured silicone', '⅛"', '¼"', '6"'), arrow:'start', cFrom:'luer', cFromSize:'Female luer', cTo:'tie', cToSize:'⅛" HB'});
   // Vent (top)
   const vf = mk('su-ventfilter', 690, 200, '0.2 µm vent', '', {detail:'25 mm PTFE, ⅜" HB'});
-  ln(bag, vf, 'n', 'w', 'sutube', '', {...T('TPE', '⅜"', '⅝"', '6"'), cFrom:'tie', cFromSize:'⅜" HB'});
+  ln(bag, vf, 'n', 'w', 'sutube', '', {...T('TPE', '⅜"', '⅝"', '6"'), arrow:'none', cFrom:'tie', cFromSize:'⅜" HB'});
   // Outlet (e2) with tee: process connector + sample bag branch
   const tee = mk('su-tee', 700, ye2, '', '', {detail:'⅜" HB, polypropylene'});
   ln(bag, tee, 'e2', 'w', 'sutube', '', {...T('TPE', '⅜"', '⅝"', '12"'), cFrom:'tie', cFromSize:'⅜" HB'});
