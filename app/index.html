@@ -642,7 +642,7 @@ const SYMBOLS = [
   {id:'titleblock', cat:'Blocks & annotations', name:'Title block', w:300, h:100, text:'none', label:'', kw:'title block drawing number revision'},
   {id:'revtable', cat:'Blocks & annotations', name:'Revision table', w:300, h:60, text:'none', label:'', kw:'revision history table change record'},
   {id:'assembly', cat:'SU assembly components', name:'Assembly boundary', w:420, h:260, text:'none', label:'ASM-1001', resizable:true, kw:'assembly boundary part number gamma sterilized irradiated autoclave su'},
-  {id:'bom', cat:'SU assembly components', name:'Bill of materials', w:380, h:80, text:'none', label:'', kw:'bom bill of materials parts list su'}
+  {id:'bom', cat:'SU assembly components', name:'Bill of materials', w:560, h:80, text:'none', label:'', kw:'bom bill of materials parts list su'}
 ];
 const SYM = Object.fromEntries(SYMBOLS.map(s => [s.id, s]));
 const CATS = [...new Set(SYMBOLS.map(s => s.cat))];
@@ -858,13 +858,14 @@ function bodySVG(n) {
     return o;
   }
   if (n.type === 'bom') {
-    const rows = computeBOM(), w = n.w, cols = [0, 34, 80, 250, w];
+    const rows = computeBOM(), w = n.w, cols = [0, 30, 72, Math.round(w * .42), Math.round(w * .68), w];
+    const ch = i => (cols[i + 1] - cols[i] - 10) / 5.6, vp = r => [r.vendor, r.pn].filter(Boolean).join(' ');
     n.h = 46 + Math.max(1, rows.length) * 18;
     let o = `<rect x="0" y="0" width="${w}" height="${n.h}"/>` + T(8, 16, 'BILL OF MATERIALS' + (bomScope() ? ' · ' + bomScope() : ''), {size:10, weight:700, anchor:'start'}) +
       `<path d="M0,24 H${w} M0,42 H${w}" fill="none" stroke-width="1"/><path d="${cols.slice(1, -1).map(x => `M${x},24 V${n.h}`).join(' ')}" fill="none" stroke-width=".8"/>` +
-      ['ITEM','QTY','DESCRIPTION','SIZE / SPEC'].map((h, i) => T(cols[i] + 5, 36, h, {size:8, weight:700, anchor:'start', fill:'#6b7280'})).join('');
+      ['ITEM','QTY','DESCRIPTION','SIZE / SPEC','VENDOR / PART NO.'].map((h, i) => T(cols[i] + 5, 36, h, {size:8, weight:700, anchor:'start', fill:'#6b7280'})).join('');
     if (!rows.length) o += T(cols[2] + 5, 56, 'No single-use parts found', {size:10, weight:500, anchor:'start', fill:'#6b7280'});
-    rows.forEach((r, i) => { const y = 56 + i*18; o += T(5, y, String(i + 1), {size:10, weight:600, anchor:'start'}) + T(39, y, r.qty, {size:10, weight:600, anchor:'start'}) + T(85, y, clipT(r.desc, 28), {size:10, weight:500, anchor:'start'}) + T(255, y, clipT(r.detail, (w - 260) / 5.6), {size:10, weight:500, anchor:'start'}); });
+    rows.forEach((r, i) => { const y = 56 + i*18; o += T(5, y, String(i + 1), {size:10, weight:600, anchor:'start'}) + T(cols[1] + 5, y, r.qty, {size:10, weight:600, anchor:'start'}) + T(cols[2] + 5, y, clipT(r.desc, ch(2)), {size:10, weight:500, anchor:'start'}) + T(cols[3] + 5, y, clipT(r.detail, ch(3)), {size:10, weight:500, anchor:'start'}) + T(cols[4] + 5, y, clipT(vp(r) || '—', ch(4)), {size:10, weight:500, anchor:'start', fill: vp(r) ? INK : '#9ca3af'}); });
     return o;
   }
   return s.draw ? s.draw(n) : s.svg;
@@ -1615,6 +1616,7 @@ function renderProps() {
       h += field(n.type === 'zone' ? 'Room / suite name' : s.text === 'instrument' ? 'Tag — letters + loop (e.g. PIT 201)' : 'Label', `<textarea data-f="label" rows="2">${esc(n.label)}</textarea>`);
     }
     if (s.text === 'below' && n.type !== 'junction') h += field('Spec / size (for lists &amp; BOM)', inp('data-f="detail"', n.detail, s.cls === 'part' ? 'e.g. ½" HB, polypropylene' : s.cls === 'valve' ? 'e.g. 1" TC, EPDM diaphragm' : 'e.g. 316L, 2000 L working'));
+    if ((s.cls === 'part' || n.su) && s.text === 'below') h += `<div class="row2">${field('Vendor', inp('data-f="vendor"', n.vendor, 'e.g. Sartorius'))}${field('Part no.', inp('data-f="pn"', n.pn, 'Catalogue / item no.'))}</div>`;
     if (isEquip(s)) h += sect('Equipment design data', `<div class="row2">${field('Volume / capacity', inp('data-f="vol"', n.vol, '2000 L'))}${field('Material', inp('data-f="moc"', n.moc, '316L SF4'))}</div><div class="row2">${field('Design pressure', inp('data-f="dp"', n.dp, 'FV / 3 barg'))}${field('Design temp.', inp('data-f="dt"', n.dt, '-10 / 150 °C'))}</div>`, mode === 'pid');
     if (!['zone','text','legend','titleblock','note','assembly','revtable','bom','junction'].includes(n.type))
       h += field('Fill', `<div class="swatches">${FILLS.map(c => `<div class="sw ${(n.fill || '#ffffff') === c ? 'on' : ''}" data-fill="${c}" style="background:${c}"></div>`).join('')}</div>`);
@@ -1639,9 +1641,11 @@ function renderProps() {
         `<p class="note" style="margin-top:0">Tag format: size-service-number-class-insulation (e.g. 1.5"-WFI-1001-SS-BPE-SF4). Lists are in Reports.</p>`, mode === 'pid')) +
       (sig ? '' : sect('Tubing (single-use)',
         `<div class="row2">${field('Material', inp('data-e="tubeMat"', e.tubeMat, 'TPE', 'dl-tmat'))}${field('Length', inp('data-e="tubeLen"', e.tubeLen, '24"'))}</div>` +
-        `<div class="row2">${field('ID', inp('data-e="tubeId"', e.tubeId, '⅜"', 'dl-tid'))}${field('OD', inp('data-e="tubeOd"', e.tubeOd, '⅝"', 'dl-tod'))}</div>`, mode === 'su' || e.type === 'sutube')) +
+        `<div class="row2">${field('ID', inp('data-e="tubeId"', e.tubeId, '⅜"', 'dl-tid'))}${field('OD', inp('data-e="tubeOd"', e.tubeOd, '⅝"', 'dl-tod'))}</div>` +
+        `<div class="row2">${field('Vendor', inp('data-e="tubeVendor"', e.tubeVendor, 'e.g. Saint-Gobain'))}${field('Part no.', inp('data-e="tubePn"', e.tubePn, 'Catalogue no.'))}</div>`, mode === 'su' || e.type === 'sutube')) +
       sect('Connections', [['cFrom', `At start (${esc(nm(a))})`], ['cMid', 'Inline (mid-line)'], ['cTo', `At end (${esc(nm(b))})`]].map(([k, lab]) =>
-        field(lab, `<select data-e="${k}">${connOptions(e[k])}</select>` + (e[k] ? `<input data-e="${k}Size" list="${sizeList(e[k])}" value="${esc(e[k + 'Size'])}" placeholder="Size (pick or type)" style="margin-top:6px">` : ''))).join('') +
+        field(lab, `<select data-e="${k}">${connOptions(e[k])}</select>` + (e[k] ? `<input data-e="${k}Size" list="${sizeList(e[k])}" value="${esc(e[k + 'Size'])}" placeholder="Size (pick or type)" style="margin-top:6px">` : '') +
+          (e[k] && CONNS[e[k]]?.fam === 'as' ? `<div class="row2" style="margin-top:6px">${inp(`data-e="${k}Vendor"`, e[k + 'Vendor'], 'Vendor')}${inp(`data-e="${k}Pn"`, e[k + 'Pn'], 'Part no.')}</div>` : ''))).join('') +
         check('data-dflag="showSizes"', doc.showSizes, 'Show connector sizes on diagram'), true) +
       check('data-dflag="showLineData"', doc.showLineData, 'Show line tags &amp; tubing specs on diagram') +
       `<div class="btns"><button class="btn danger" data-act="del">Delete</button></div>` +
@@ -1844,22 +1848,22 @@ function lenInches(t) {
 }
 function computeBOM() {
   const rows = new Map();
-  const add = (desc, detail, q, tube) => { const k = desc + '|' + detail; const r = rows.get(k) || {desc, detail, n:0, miss:0, tube}; if (q === null) r.miss++; else r.n += q; rows.set(k, r); };
+  const add = (desc, detail, q, tube, vendor = '', pn = '', id = '') => { const k = [desc, detail, vendor, pn].join('|'); const r = rows.get(k) || {desc, detail, vendor, pn, id, n:0, miss:0, tube}; if (q === null) r.miss++; else r.n += q; rows.set(k, r); };
   for (const n of doc.nodes) {
     const s = SYM[n.type]; if (!s || NO_PORTS.includes(n.type) || n.type === 'junction') continue;
     if (!(s.cls === 'part' || n.su)) continue;
     if (!inAsm(n.x + n.w/2, n.y + n.h/2)) continue;
-    add(typeName(n), n.detail || '', 1);
+    add(typeName(n), n.detail || '', 1, false, n.vendor || '', n.pn || '', n.id);
   }
   for (const e of doc.edges) {
     const p = route(e); if (!p) continue; const m = midpoint(p);
     if (!inAsm(m[0], m[1])) continue;
-    for (const k of ['cFrom','cMid','cTo']) if (e[k] && CONNS[e[k]] && CONNS[e[k]].fam === 'as') add(CONNS[e[k]].name, e[k + 'Size'] || '', 1);
+    for (const k of ['cFrom','cMid','cTo']) if (e[k] && CONNS[e[k]] && CONNS[e[k]].fam === 'as') add(CONNS[e[k]].name, e[k + 'Size'] || '', 1, false, e[k + 'Vendor'] || '', e[k + 'Pn'] || '', e.id);
     if (e.type === 'sutube' || e.tubeMat || e.tubeId)
-      add('Tubing' + (e.tubeMat ? ' — ' + e.tubeMat : ''), e.tubeId ? `${e.tubeId}${e.tubeOd ? ' ID × ' + e.tubeOd + ' OD' : ' ID'}` : '', lenInches(e.tubeLen), true);
+      add('Tubing' + (e.tubeMat ? ' — ' + e.tubeMat : ''), e.tubeId ? `${e.tubeId}${e.tubeOd ? ' ID × ' + e.tubeOd + ' OD' : ' ID'}` : '', lenInches(e.tubeLen), true, e.tubeVendor || '', e.tubePn || '', e.id);
   }
   return [...rows.values()].sort((a, b) => (a.tube ? 1 : 0) - (b.tube ? 1 : 0) || a.desc.localeCompare(b.desc))
-    .map(r => ({desc:r.desc, detail:r.detail, qty: r.tube ? (r.n ? `${Math.round(r.n * 10) / 10} in` : '') + (r.miss ? `${r.n ? ' + ' : ''}${r.miss} seg.` : '') : String(r.n)}));
+    .map(r => ({desc:r.desc, detail:r.detail, vendor:r.vendor, pn:r.pn, id:r.id, qty: r.tube ? (r.n ? `${Math.round(r.n * 10) / 10} in` : '') + (r.miss ? `${r.n ? ' + ' : ''}${r.miss} seg.` : '') : String(r.n)}));
 }
 const csvCell = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const toCSV = rows => '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
@@ -1892,8 +1896,23 @@ const REPORTS = {
   connections: {name:'Connection schedule', rows: () => { const out = [['Line','From','To','Position','Connection type','Family','Size']];
     for (const e of doc.edges) for (const [k, pos] of [['cFrom','Start'],['cMid','Inline'],['cTo','End']]) if (e[k] && CONNS[e[k]]) out.push([lineTag(e), endName(e, 'from'), endName(e, 'to'), pos, CONNS[e[k]].name, CONNS[e[k]].fam === 'as' ? 'Aseptic / single-use' : 'Stainless / hygienic', e[k + 'Size']]);
     return out; }},
-  bom: {name:'Bill of materials (SU)', rows: () => [['Item','Qty','Description','Size / spec'], ...computeBOM().map((r, i) => [i + 1, r.qty, r.desc, r.detail])]}
+  bom: {name:'Bill of materials (SU)', rows: () => [['Item','Qty','Description','Size / spec','Vendor','Part no.'], ...computeBOM().map((r, i) => [i + 1, r.qty, r.desc, r.detail, r.vendor, r.pn])]}
 };
+// Barb / tubing size checks: read inch (or mm) sizes from the parts of a spec that name a barb or a tubing ID
+const FRAC = {'⅛':.125,'¼':.25,'⅜':.375,'½':.5,'⅝':.625,'¾':.75,'⅞':.875};
+function sizesIn(str) {
+  const out = [];
+  for (const m of String(str || '').matchAll(/(\d+\s+\d+\/\d+|\d+\/\d+|\d*[⅛¼⅜½⅝¾⅞]|\d+(?:\.\d+)?)\s*("|”|in\b|mm\b)/g)) {
+    let t = m[1].trim(), v;
+    if (t.includes('/')) { const [w, f] = t.includes(' ') ? t.split(/\s+/) : ['0', t]; const [a, b] = f.split('/').map(Number); v = Number(w) + a / b; }
+    else if (/[⅛¼⅜½⅝¾⅞]/.test(t)) v = (Number(t.slice(0, -1)) || 0) + FRAC[t.slice(-1)];
+    else v = Number(t);
+    out.push(m[2] === 'mm' ? v / 25.4 : v);
+  }
+  return out;
+}
+const barbSizes = str => String(str || '').split(/[,;]/).filter(x => /\bHB\b|barb|ID\b/i.test(x)).flatMap(sizesIn);
+const fmtIn = v => (Object.entries(FRAC).find(([, f]) => Math.abs(f - v) < .001) || [])[0] ? (Object.entries(FRAC).find(([, f]) => Math.abs(f - v) < .001)[0] + '"') : (Math.round(v * 1000) / 1000) + '"';
 function runChecks() {
   const out = [], mode = doc.mode || 'pfd';
   const push = (sev, msg, id) => out.push({sev, msg, id});
@@ -1923,8 +1942,16 @@ function runChecks() {
       if (e.lineNo) { const k = e.lineNo; if (lineSvc[k] && e.service && lineSvc[k] !== e.service) push('warn', `Line no. ${k} used for both ${lineSvc[k]} and ${e.service}`, e.id); else lineSvc[k] = lineSvc[k] || e.service; }
     }
     if (mode === 'su' && (e.type === 'sutube') && (!e.tubeMat || !e.tubeId || !e.tubeLen)) push('warn', `Tubing ${nm}: missing ${[!e.tubeMat && 'material', !e.tubeId && 'ID', !e.tubeLen && 'length'].filter(Boolean).join(', ')}`, e.id);
+    if (e.tubeId) {
+      const id = sizesIn(/["”]|mm|in\b/.test(e.tubeId) ? e.tubeId : e.tubeId + '"')[0];
+      if (id) for (const [src, spec] of [[tagOf(a) || SYM[a.type]?.name, a.detail], [tagOf(b) || SYM[b.type]?.name, b.detail], [CONNS[e.cFrom]?.name, e.cFromSize], [CONNS[e.cMid]?.name, e.cMidSize], [CONNS[e.cTo]?.name, e.cToSize]]) {
+        const sz = barbSizes(spec);
+        if (sz.length && !sz.some(v => Math.abs(v - id) < .01)) push('err', `Tubing ${nm}: ${e.tubeId} ID tubing on ${src} sized for ${[...new Set(sz.map(fmtIn))].join(' / ')}`, e.id);
+      }
+    }
     for (const k of ['cFrom','cMid','cTo']) if (e[k] && !e[k + 'Size'] && mode !== 'pfd') push('warn', `${CONNS[e[k]]?.name} on ${nm} has no size`, e.id);
   }
+  if (mode === 'su') for (const r of computeBOM()) if (!r.pn) push('warn', `BOM: ${r.desc}${r.detail ? ' (' + r.detail + ')' : ''} has no part number`, r.id);
   return out;
 }
 function reportRows(k) {
@@ -2443,7 +2470,7 @@ function tplSU() {
   const vf = mk('su-ventfilter', 690, 200, '0.2 µm vent', '', {detail:'25 mm PTFE, ⅜" HB'});
   ln(bag, vf, 'n', 'w', 'sutube', '', {...T('TPE', '⅜"', '⅝"', '6"'), arrow:'none', cFrom:'tie', cFromSize:'⅜" HB'});
   // Outlet (e2) with tee: process connector + sample bag branch
-  const tee = mk('su-tee', 700, ye2, '', '', {detail:'⅜" HB, polypropylene'});
+  const tee = mk('su-tee', 700, ye2, '', '', {detail:'⅜" × ⅜" × ⅛" HB reducing tee, polypropylene'});
   ln(bag, tee, 'e2', 'w', 'sutube', '', {...T('TPE', '⅜"', '⅝"', '12"'), cFrom:'tie', cFromSize:'⅜" HB'});
   const pc2 = mk('pinch-clamp', 830, ye2, '', '', {detail:'for ⅜" ID tubing'});
   ln(tee, pc2, 'e', 'w', 'sutube', '', T('TPE', '⅜"', '⅝"', '18"'));
@@ -2454,7 +2481,7 @@ function tplSU() {
   const sb = mk('sample-bag', 700, ye2 + 220, 'Sample bag', '', {detail:'100 mL'});
   ln(pc3, sb, 's', 'n', 'sutube', '', {...T('Platinum-cured silicone', '⅛"', '¼"', '6"'), cTo:'tie', cToSize:'⅛" HB'});
   d.nodes.unshift({id:uid(), type:'assembly', x:100, y:140, w:960, h:470, label:'ASM-1001', desc:'50 L buffer bag', steril:'Gamma'});
-  d.nodes.push({id:uid(), type:'bom', x:1100, y:140, w:420, h:80, label:''});
+  d.nodes.push({id:uid(), type:'bom', x:1100, y:140, w:560, h:80, label:''});
   d.nodes.push({id:uid(), type:'legend', x:1100, y:560, w:260, h:150, label:''});
   d.nodes.push({id:uid(), type:'titleblock', x:100, y:650, w:300, h:100, label:'', meta:{docno:'ASM-1001', rev:'A', date:new Date().toISOString().slice(0,10), site:'Single-use assemblies', by:'', status:'Draft'}});
   d.nodes.push({id:uid(), type:'revtable', x:420, y:650, w:300, h:60, label:''});
