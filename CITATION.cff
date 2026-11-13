@@ -10,7 +10,7 @@ version: 1.0.0
 date-released: "2026-11-12"
 license: MIT
 repository-code: "https://github.com/MinaryBytes/Pidgeon"
-url: "https://minarybytes.github.io/Pidgeon/"
+url: "https://pidgeon.studio/"
 abstract: >-
   Free, open-source, browser-based editor for pharmaceutical process flow
   diagrams, piping and instrumentation diagrams and single-use assembly

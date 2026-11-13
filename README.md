@@ -2,7 +2,7 @@
 
 **Free, open-source editor for pharma process diagrams: PFDs, P&IDs and single-use assembly drawings. Runs entirely in your browser.**
 
-[Open the editor](https://minarybytes.github.io/Pidgeon/app/) · [Website](https://minarybytes.github.io/Pidgeon/) · [Guide](https://minarybytes.github.io/Pidgeon/guide.html)
+[Open the editor](https://pidgeon.studio/app/) · [Website](https://pidgeon.studio/) · [Guide](https://pidgeon.studio/guide.html)
 
 ![A P&ID drawn in Pidgeon](assets/drawing-pid.svg)
 
