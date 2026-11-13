@@ -171,7 +171,7 @@ table.keys td:first-child{white-space:nowrap;width:44%}
     <button class="btn" id="bReports" title="Equipment, line, instrument and valve lists, BOM, drawing check">Reports</button>
     <div class="spacer"></div>
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted)">Type
-      <select id="modeSel"><option value="pfd">PFD</option><option value="pid">P&amp;ID</option><option value="su">SU assembly</option></select></label>
+      <select id="modeSel"><option value="pfd">PFD</option><option value="pid">P&amp;ID</option><option value="su">Single Use Flow Diagram</option></select></label>
     <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted)">New line
       <select id="lineSel"></select></label>
     <button class="btn" id="bHelp" title="Shortcuts">?</button>
@@ -293,7 +293,7 @@ const MODES = {
         cats:[]},
   pid: {name:'P&ID', doc:'Piping & instrumentation diagram', line:'process',
         cats:['Pumps, valves & piping', 'Instruments & control', 'Connections — stainless / hygienic']},
-  su:  {name:'SU assembly', doc:'Single-use component flow diagram', line:'sutube',
+  su:  {name:'Single Use Flow Diagram', doc:'Single Use Flow Diagram', line:'sutube',
         cats:['SU assembly components', 'Single-use systems', 'Storage', 'Connections — aseptic / single-use', 'Connections — stainless / hygienic']}
 };
 /* ---------- Neutral line-data defaults (edit to match a site standard) ---------- */
@@ -2611,7 +2611,7 @@ const TEMPLATES = [
   ['fill', 'Aseptic fill–finish', 'Thaw/pool, redundant sterile filtration, isolator filling, lyo, capping, inspection, packaging.', tplFill],
   ['osd', 'Oral solid dose (tablet)', 'Dispense, wet granulation, FBD, milling, blending, compression, coating, blister.', tplOSD],
   ['pid', 'P&amp;ID — buffer hold tank', 'ISA-5.1 loops (LIT, TIT, FIC→CV), interlocked XV, zero-static drain valve, nozzles, line tags, line list.', tplPID],
-  ['su', 'SU assembly — 50 L bag', 'Disposable component flow diagram: tubing specs, aseptic connectors, clamps, tee, sample bag, auto BOM.', tplSU]
+  ['su', 'Single Use Flow Diagram — 50 L bag', 'Disposable component flow diagram: tubing specs, aseptic connectors, clamps, tee, sample bag, auto BOM.', tplSU]
 ];
 function openTemplates(isNew) {
   openModal(isNew ? 'New diagram' : 'Templates', `<div class="tpl-grid">${TEMPLATES.map(([id, t, dsc]) => `<button class="tpl" data-tpl="${id}"><b>${t}</b><span>${dsc}</span></button>`).join('')}</div><p class="note">Starting a new diagram replaces the current canvas. Save it first (Save &amp; export → .json) if you want to keep it; Undo also brings it back.</p>`);
