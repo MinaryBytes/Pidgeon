@@ -50,7 +50,7 @@ Bug reports, symbol requests and pull requests are welcome via [GitHub issues](h
 
 ## About
 
-Created and maintained by Minhazuddin Mohammed ([MinaryBytes](https://github.com/MinaryBytes)). To cite Pidgeon, use **Cite this repository** on GitHub (from `CITATION.cff`).
+Created and maintained by Minhazuddin Mohammed ([MinaryBytes](https://github.com/MinaryBytes), [LinkedIn](https://www.linkedin.com/in/minhazuddinm/)). To cite Pidgeon, use **Cite this repository** on GitHub (from `CITATION.cff`).
 
 ## Licence
 
