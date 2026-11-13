@@ -322,6 +322,12 @@ const DF_FMT = [['pod','Pod — flat-plate modules in a holder'],['lens','Lentic
 const typeName = n => SYM[n.type].name + (n.type === 'depth-filter' ? (n.fmt === 'lens' ? ' — lenticular capsule' : ' — pod') : '');
 const SYMBOLS = [
   // Upstream
+  S('vial','Upstream','Cell bank vial',24,48,
+    `<rect x="5" y="2" width="14" height="10" rx="1.5"/><path d="M8.5,4.5 V9.5 M12,4.5 V9.5 M15.5,4.5 V9.5" fill="none" stroke-width=".8"/><path d="M6,12 H18 V40 Q18,46 12,46 Q6,46 6,40 Z"/><rect x="6" y="16" width="12" height="9" fill="none" stroke-width=".8"/><path d="M6,32 H18" fill="none" stroke-width="1" stroke-dasharray="2 1.5"/>`,
+    {prefix:'V', label:'WCB vial', su:true, kw:'cryovial vial cell bank wcb mcb thaw inoculum seed cryopreserved'}),
+  S('shake-flask','Upstream','Shake flask',50,66,
+    `<rect x="18" y="2" width="14" height="8" rx="1.5"/><path d="M21,6 H29" fill="none" stroke-width="1" stroke-dasharray="2 1.5"/><path d="M21,10 V22 L6,57 Q3.5,64 11,64 H39 Q46.5,64 44,57 L29,22 V10 Z"/><path d="M11,48 Q18,45 25,48 T39,48" fill="none" stroke-width="1"/>`,
+    {prefix:'SF', label:'Shake flask', su:true, kw:'shake flask erlenmeyer vented cap seed expansion inoculum train orbital shaker'}),
   S('rocker','Upstream','Rocking bioreactor',100,64,
     `<g transform="rotate(-5 50 40)"><rect x="8" y="36" width="84" height="7" rx="2"/><path d="M14,36 Q50,8 86,36 Z"/><path d="M32,24 v-6 M68,24 v-6" fill="none"/></g><path d="M42,62 L50,46 L58,62 Z"/><path d="M28,62 H72" fill="none"/>`,
     {prefix:'SB', su:true, kw:'wave seed bag rocker inoculum single-use su'}),
