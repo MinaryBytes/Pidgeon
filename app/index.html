@@ -291,6 +291,7 @@ const SERVICES = [['PR','Process'],['WFI','Water for injection'],['PW','Purified
 const SPECS = [['SS-BPE-SF4','316L SS, ASME BPE, electropolished'],['SS-BPE-SF1','316L SS, ASME BPE, mech. polished'],['SS-UT','304/316 SS utility'],['CS-UT','Carbon steel utility'],['SU-TPE','Single-use TPE tubing'],['SU-SIL','Single-use silicone tubing'],['PVDF','PVDF'],['PP','Polypropylene drain']];
 const INSUL = [['','None'],['H','Heat conservation'],['C','Cold / anti-sweat'],['P','Personnel protection'],['ET','Electric trace'],['ST','Steam trace']];
 const PIPE_SIZES = ['¼"','⅜"','½"','¾"','1"','1.5"','2"','2.5"','3"','4"','6"'];
+const MEAS_VARS = ['pH','DO','dCO₂','Conductivity','UV 280','Turbidity','VCD','Capacitance','Glucose','Lactate','Osmolality','O₂ off-gas','CO₂ off-gas','Foam','Weight','Bubble'];
 const TUBE_MAT = ['TPE','Platinum-cured silicone','Braided silicone','Fluoropolymer-lined','PVC'];
 const TUBE_ID = ['⅛"','3/16"','¼"','⅜"','½"','⅝"','¾"','1"'];
 const TUBE_OD = ['¼"','5/16"','⅜"','7/16"','½"','⅝"','11/16"','¾"','⅞"','1"','1¼"','1⅜"'];
@@ -912,7 +913,8 @@ function nodeSVG(n, exp) {
     }
   } else if (s.text === 'instrument') {
     const [a, ...b] = label.trim().split(/\s+/);
-    o += T(20, 16, a || '', {size:10, weight:700}) + T(20, 31, b.join(' '), {size:9, weight:500});
+    o += T(20, 16, a || '', {size:(a || '').length > 4 ? 8 : (a || '').length > 3 ? 9 : 10, weight:700}) + T(20, 31, b.join(' '), {size:9, weight:500});
+    if (n.imeas) o += T(43, 9, n.imeas, {size:9, weight:600, anchor:'start', fill:'#475569'});
   }
   if (isSel) {
     o += `<rect x="-5" y="-5" width="${n.w+10}" height="${n.h+10}" fill="none" stroke="#0ea5e9" stroke-width="1.2" stroke-dasharray="4 3" rx="4" pointer-events="none"/>`;
@@ -1581,6 +1583,7 @@ function renderProps() {
     if (s.text === 'below' && n.type !== 'junction') h += field(s.cls === 'valve' ? 'Valve tag' : s.cls === 'part' ? 'Part / item tag' : 'Equipment tag', `<input data-f="tag" value="${esc(n.tag)}" placeholder="e.g. ${s.prefix || 'EQ'}-101">`);
     if (s.text === 'below' || n.type === 'box') h += check('data-su', n.su, `Single-use component ${suBadge(0,0).replace(/^<g[^>]*>/, '<svg width="20" height="13" style="vertical-align:middle"><g>').replace(/<\/g>$/, '</g></svg>')}`);
     if (n.type === 'zone') h += field('Classification', sel1('data-f="grade"', Object.keys(GRADES).map(g => [g, g === 'CNC' ? 'CNC (controlled not classified)' : 'Grade ' + g]), n.grade));
+    if (s.text === 'instrument') h += field('Measured variable / note', inp('data-f="imeas"', n.imeas, 'e.g. pH, DO, UV 280', 'dl-meas') + dl('dl-meas', MEAS_VARS));
     if (n.type === 'instrument') h += field('Function implemented in', sel1('data-f="ikind"', IKIND, n.ikind || 'discrete')) + field('Location / access', sel1('data-f="iloc"', ILOC, n.iloc || 'main'));
     if (n.type === 'depth-filter') h += field('Format', sel1('data-f="fmt"', DF_FMT, n.fmt || 'pod'));
     if (n.type === 'cv' || n.type === 'sov') h += field('Fail position', sel1('data-f="fail"', FAILS, n.fail || 'FC'));
@@ -1879,10 +1882,10 @@ const REPORTS = {
     }).sort((a, b) => String(a[4]).localeCompare(String(b[4]), undefined, {numeric:true}));
     return [['Line tag','Size','Service','Service description','Line no.','Pipe class / spec','Insulation','From','To','Inline items','Segments','Line type','Stream','Tubing material','Tubing ID','Tubing OD','Tubing length'], ...rows];
   }},
-  instruments: {name:'Instrument index', rows: () => [['Tag','Function letters','Loop','Implemented in','Location','Connected to'],
+  instruments: {name:'Instrument index', rows: () => [['Tag','Function letters','Loop','Measured variable / note','Implemented in','Location','Connected to'],
     ...doc.nodes.filter(n => SYM[n.type]?.text === 'instrument').map(n => { const [f, ...l] = String(n.label || '').trim().split(/\s+/);
       const conn = doc.edges.filter(e => e.from.node === n.id || e.to.node === n.id).map(e => tagOf(byId(e.from.node === n.id ? e.to.node : e.from.node))).join('; ');
-      return [n.label, f, l.join(' '), n.type === 'interlock' ? 'Interlock' : lab(IKIND, n.ikind || 'discrete'), n.type === 'interlock' ? '' : lab(ILOC, n.iloc || 'main'), conn]; })]},
+      return [n.label, f, l.join(' '), n.imeas || '', n.type === 'interlock' ? 'Interlock' : lab(IKIND, n.ikind || 'discrete'), n.type === 'interlock' ? '' : lab(ILOC, n.iloc || 'main'), conn]; })]},
   valves: {name:'Valve list', rows: () => [['Tag','Type','Spec / size','Fail position','On line','Between'],
     ...doc.nodes.filter(n => SYM[n.type]?.cls === 'valve').map(n => { const es = doc.edges.filter(e => (e.from.node === n.id || e.to.node === n.id) && !LINES[e.type]?.sig);
       return [n.tag, SYM[n.type].name, n.detail, n.fail || '', [...new Set(es.map(lineTag).filter(Boolean))].join('; '), es.map(e => tagOf(byId(e.from.node === n.id ? e.to.node : e.from.node))).join(' ↔ ')]; })]},
@@ -1905,6 +1908,7 @@ function runChecks() {
     else if (n.type === 'junction' && d < 3) push('warn', `Junction with ${d} line${d === 1 ? '' : 's'} — a tee needs 3`, n.id);
     else if (d === 0 && mode !== 'pfd') push('warn', `${tagOf(n) || s.name}: not connected`, n.id);
     if (s.text === 'instrument' && !/^[A-Z]{1,5}\s+\S+/.test(String(n.label || '').trim())) push('warn', `Instrument "${n.label || ''}" — use letters + loop number (e.g. PIT 201)`, n.id);
+    else if (n.type === 'instrument' && /^[AXUY]/.test(String(n.label || '').trim()) && !n.imeas) push('warn', `Instrument ${n.label} — add the measured variable (e.g. pH, DO) for analysis or user-defined letters`, n.id);
     if (isEquip(s) && !n.tag && mode !== 'pfd') push('warn', `${s.name} has no equipment tag`, n.id);
   }
   const lineSvc = {};
