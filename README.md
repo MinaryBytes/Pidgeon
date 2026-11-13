@@ -48,6 +48,10 @@ Pidgeon is intended for concept work, design reviews and mark-ups. Drawings that
 
 Bug reports, symbol requests and pull requests are welcome via [GitHub issues](https://github.com/MinaryBytes/Pidgeon/issues). If a drawing shows the problem, attach its `.json` file after removing anything confidential.
 
+## About
+
+Created and maintained by Minhazuddin Mohammed ([MinaryBytes](https://github.com/MinaryBytes)). To cite Pidgeon, use **Cite this repository** on GitHub (from `CITATION.cff`).
+
 ## Licence
 
 MIT. Third-party components are listed in [NOTICE.md](NOTICE.md).

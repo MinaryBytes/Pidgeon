@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use Pidgeon in a report or publication, please cite it as below."
+title: "Pidgeon: process diagram editor for pharma (PFD, P&ID and single-use assembly drawings)"
+type: software
+authors:
+  - given-names: Minhazuddin
+    family-names: Mohammed
+    alias: MinaryBytes
+version: 1.0.0
+date-released: "2026-11-12"
+license: MIT
+repository-code: "https://github.com/MinaryBytes/Pidgeon"
+url: "https://minarybytes.github.io/Pidgeon/"
+abstract: >-
+  Free, open-source, browser-based editor for pharmaceutical process flow
+  diagrams, piping and instrumentation diagrams and single-use assembly
+  drawings, with ISA-5.1 instrumentation, line and equipment lists, a
+  bill of materials, and PDF and DXF export.
+keywords:
+  - process flow diagram
+  - P&ID
+  - single-use
+  - biopharmaceutical manufacturing
+  - process engineering
