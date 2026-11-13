@@ -206,7 +206,7 @@ const T = (x, y, s, opt = {}) => `<text x="${x}" y="${y}" font-size="${opt.size 
 /* ---------- Line (stream) types ---------- */
 const LINES = {
   process:  {name:'Process stream',            color:'#1f2a37', w:2,   dash:''},
-  sutube:   {name:'Single-use tubing',         color:'#0891b2', w:2,   dash:''},
+  sutube:   {name:'Single-use tubing',         color:'#0891b2', w:1.8, dash:'', wavy:true},
   utility:  {name:'Utility (WFI, steam, gas)', color:'#2563eb', w:1.6, dash:'8 4'},
   cip:      {name:'CIP / SIP',                 color:'#0f766e', w:1.6, dash:'6 2 2 2'},
   transfer: {name:'Manual / mobile transfer',  color:'#7c3aed', w:1.8, dash:'14 6'},
@@ -748,8 +748,31 @@ function textLines(lines, cx, cy, size, weight = 500) {
   const lh = size * 1.25, y0 = cy - (lines.length - 1) * lh / 2 + size * .35;
   return lines.map((l, i) => T(cx, y0 + i*lh, l, {size, weight})).join('');
 }
+// Flexible tubing is drawn as a gentle wave: quadratic half-waves between straight lead-ins,
+// so arrowheads, connection markers and ports still meet the line square.
+function wavyD(pts, lead = 12, amp = 2.6, wave = 11) {
+  const f = v => v.toFixed(1);
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  const last = pts.length - 1;
+  for (let i = 1; i <= last; i++) {
+    const [ax, ay] = pts[i-1], [bx, by] = pts[i], L = Math.hypot(bx - ax, by - ay);
+    const s0 = i === 1 ? Math.min(lead, L / 3) : 0, s1 = L - (i === last ? Math.min(lead, L / 3) : 0);
+    const run = s1 - s0, k = Math.round(run / (wave / 2) / 2) * 2;      // even number of half-waves
+    if (L < 1 || k < 2) { d += ` L${f(bx)},${f(by)}`; continue; }
+    const ux = (bx - ax) / L, uy = (by - ay) / L, nx = -uy, ny = ux, h = run / k;
+    const P = t => [ax + ux * t, ay + uy * t];
+    if (s0 > 0) { const [x, y] = P(s0); d += ` L${f(x)},${f(y)}`; }
+    for (let j = 0; j < k; j++) {
+      const sgn = j % 2 ? -1 : 1, [mx, my] = P(s0 + h * (j + .5)), [ex, ey] = P(s0 + h * (j + 1));
+      d += ` Q${f(mx + nx * amp * 2 * sgn)},${f(my + ny * amp * 2 * sgn)} ${f(ex)},${f(ey)}`;
+    }
+    d += ` L${f(bx)},${f(by)}`;
+  }
+  return d;
+}
 function lineSample(type, x1, y, x2) {
   const L = LINES[type];
+  if (L.wavy) return `<path d="${wavyD([[x1, y], [x2, y]], 6, 2.2, 9)}" fill="none" stroke="${L.color}" stroke-width="${L.w}" stroke-linejoin="round"/>`;
   return `<path d="M${x1},${y} H${x2}" fill="none" stroke="${L.color}" stroke-width="${L.w}" ${L.dash ? `stroke-dasharray="${L.dash}"` : ''} ${L.sig ? '' : `marker-end="url(#arr-${type})"`}/>` +
     (L.decor ? `<g transform="translate(${(x1 + x2) / 2},${y})" fill="none" stroke="${L.color}">${DECOR[L.decor]}</g>` : '');
 }
@@ -913,7 +936,7 @@ function edgeSVG(e, exp, H, pts, tagText = '') {
   const ms = arrow === 'start' || arrow === 'both' ? `marker-start="url(#arrS-${e.type})"` : '';
   let o = `<g data-edge="${e.id}">`;
   if (isSel) o += `<path d="${d}" fill="none" stroke="#0ea5e9" stroke-width="${L.w+7}" stroke-opacity=".22" stroke-linejoin="round"/>`;
-  o += `<path d="${d}" fill="none" stroke="${L.color}" stroke-width="${L.w}" ${L.dash ? `stroke-dasharray="${L.dash}"` : ''} stroke-linejoin="round" ${me} ${ms}/>`;
+  o += `<path d="${L.wavy ? wavyD(pts) : d}" fill="none" stroke="${L.color}" stroke-width="${L.w}" ${L.dash ? `stroke-dasharray="${L.dash}"` : ''} stroke-linejoin="round" ${me} ${ms}/>`;
   o += decorAlong(L, pts);
   if (!exp) o += `<path class="ehit" d="${d}" fill="none" stroke="transparent" stroke-width="12"/>`;
   const LEN = pathLen(pts);
