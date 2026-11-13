@@ -1116,8 +1116,115 @@ function layers(exp) {
   const draw = list => { let o = '', g = ''; for (const n of list) { if (!nodeVis(n, st)) { if (ghostOk(inLayers(n))) g += nodeSVG(n, true); continue; } o += nodeSVG(n, exp); if (badges && n.steps) o += stepBadge(n.steps, n.x + n.w / 2, n.y - 12); } return ghostWrap(g) + o; };
   return {z: draw(doc.nodes.filter(isBack)), e: edgesSVG(exp), n: draw(doc.nodes.filter(n => !isBack(n)))};
 }
+/* ---------- Smart guides ----------
+   While shapes are dragged, their left/centre/right and top/middle/bottom lines snap to the same lines on
+   nearby shapes, and to equal gaps between neighbours in a row or column. Alt suspends it. */
+const GUIDE_SKIP = new Set(['titleblock','legend','bom','revtable','zone','assembly']);
+function boxOf(ns) { const x1 = Math.min(...ns.map(n => n.x)), y1 = Math.min(...ns.map(n => n.y)), x2 = Math.max(...ns.map(n => n.x + n.w)), y2 = Math.max(...ns.map(n => n.y + n.h)); return {x1, y1, x2, y2, cx:(x1 + x2) / 2, cy:(y1 + y2) / 2}; }
+function smartGuides(ids, dx, dy) {
+  const moving = ids.map(id => byId(id)).filter(Boolean), set = new Set(ids);
+  const b0 = boxOf(moving.map(n => ({x:drag.orig[n.id][0], y:drag.orig[n.id][1], w:n.w, h:n.h})));
+  const b = {x1:b0.x1 + dx, x2:b0.x2 + dx, y1:b0.y1 + dy, y2:b0.y2 + dy}; b.cx = (b.x1 + b.x2) / 2; b.cy = (b.y1 + b.y2) / 2;
+  const others = doc.nodes.filter(n => !set.has(n.id) && !GUIDE_SKIP.has(n.type) && nodeVis(n)).map(n => ({x1:n.x, y1:n.y, x2:n.x + n.w, y2:n.y + n.h, cx:n.x + n.w / 2, cy:n.y + n.h / 2}));
+  const tol = 7 / view.k, near = 900;
+  const lines = [];
+  // 1. Edge / centre alignment
+  const bestAlign = (keys, axis) => {
+    let best = null;
+    for (const o of others) {
+      if (Math.abs((axis === 'x' ? o.cy - b.cy : o.cx - b.cx)) > near) continue;
+      for (const k of keys) for (const ok of keys) {
+        if ((k[1] === 'c' || ok[1] === 'c' || k[0] === 'c' || ok[0] === 'c') && k !== ok) continue; // centre↔centre, edge↔edge only
+        const d = o[ok] - b[k];
+        if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d) - .01)) best = {d, at:o[ok], o};
+      }
+    }
+    return best;
+  };
+  const ax = bestAlign(['x1','cx','x2'], 'x'), ay = bestAlign(['y1','cy','y2'], 'y');
+  // 2. Equal spacing with neighbours in the same row (x) or column (y)
+  const bestGap = axis => {
+    const [lo, hi, plo, phi] = axis === 'x' ? ['x1','x2','y1','y2'] : ['y1','y2','x1','x2'];
+    const band = others.filter(o => o[plo] < b[phi] && o[phi] > b[plo]);
+    const before = band.filter(o => o[hi] <= b[lo] + tol).sort((p, q) => q[hi] - p[hi]), after = band.filter(o => o[lo] >= b[hi] - tol).sort((p, q) => p[lo] - q[lo]);
+    const cands = [];
+    if (before[0] && after[0]) { const free = after[0][lo] - before[0][hi] - (b[hi] - b[lo]); if (free > 0) cands.push({d: before[0][hi] + free / 2 - b[lo], gap: free / 2, segs: [[before[0][hi], before[0][hi] + free / 2], [after[0][lo] - free / 2, after[0][lo]]]}); }
+    if (before[0] && before[1]) { const g = before[0][lo] - before[1][hi]; if (g > 0) cands.push({d: before[0][hi] + g - b[lo], gap:g, segs: [[before[1][hi], before[0][lo]], [before[0][hi], before[0][hi] + g]]}); }
+    if (after[0] && after[1]) { const g = after[1][lo] - after[0][hi]; if (g > 0) cands.push({d: after[0][lo] - g - b[hi], gap:g, segs: [[after[0][lo] - g, after[0][lo]], [after[0][hi], after[1][lo]]]}); }
+    return cands.filter(c => Math.abs(c.d) <= tol).sort((p, q) => Math.abs(p.d) - Math.abs(q.d))[0] || null;
+  };
+  const gx = ax ? null : bestGap('x'), gy = ay ? null : bestGap('y');
+  const sx = ax ? ax.d : gx ? gx.d : 0, sy = ay ? ay.d : gy ? gy.d : 0;
+  const nb = {x1:b.x1 + sx, x2:b.x2 + sx, y1:b.y1 + sy, y2:b.y2 + sy}; nb.cx = (nb.x1 + nb.x2) / 2; nb.cy = (nb.y1 + nb.y2) / 2;
+  if (ax) lines.push({k:'v', x:ax.at, y1:Math.min(nb.y1, ax.o.y1) - 12, y2:Math.max(nb.y2, ax.o.y2) + 12});
+  if (ay) lines.push({k:'h', y:ay.at, x1:Math.min(nb.x1, ay.o.x1) - 12, x2:Math.max(nb.x2, ay.o.x2) + 12});
+  if (gx) for (const [p, q] of gx.segs) lines.push({k:'gx', x1:p, x2:q, y:nb.cy});
+  if (gy) for (const [p, q] of gy.segs) lines.push({k:'gy', y1:p, y2:q, x:nb.cx});
+  return {dx: dx + sx, dy: dy + sy, lines};
+}
+function guidesSVG(lines) {
+  const c = '#e11d48', w = 1 / view.k, t = 4 / view.k;
+  return lines.map(l => l.k === 'v' ? `<line x1="${l.x}" y1="${l.y1}" x2="${l.x}" y2="${l.y2}" stroke="${c}" stroke-width="${w}"/>`
+    : l.k === 'h' ? `<line x1="${l.x1}" y1="${l.y}" x2="${l.x2}" y2="${l.y}" stroke="${c}" stroke-width="${w}"/>`
+    : l.k === 'gx' ? `<path d="M${l.x1},${l.y} H${l.x2} M${l.x1},${l.y - t} V${l.y + t} M${l.x2},${l.y - t} V${l.y + t}" stroke="${c}" stroke-width="${w}" fill="none"/>`
+    : `<path d="M${l.x},${l.y1} V${l.y2} M${l.x - t},${l.y1} H${l.x + t} M${l.x - t},${l.y2} H${l.x + t}" stroke="${c}" stroke-width="${w}" fill="none"/>`).join('');
+}
+
+/* ---------- Tidy up ----------
+   Straightens nearly-straight connections (moves the less-connected shape so the ports line up), lines up
+   shapes whose centres are almost level or plumb, then snaps everything to the grid. Works on the selection,
+   or the whole sheet when nothing is selected. */
+function tidyUp() {
+  const pick = sel.size ? doc.nodes.filter(n => sel.has(n.id)) : doc.nodes.filter(n => nodeVis(n));
+  const ns = pick.filter(n => !GUIDE_SKIP.has(n.type) && SYM[n.type]), ids = new Set(ns.map(n => n.id));
+  if (!ns.length) { toast('Nothing to tidy'); return; }
+  const before = JSON.stringify(ns.map(n => [n.x, n.y]));
+  const deg = id => doc.edges.filter(e => e.from.node === id || e.to.node === id).length;
+  const TOL = 24;
+  for (const axis of ['y', 'x']) {
+    // Connections whose two ports are within TOL of each other across the run
+    const cons = [];
+    for (const e of doc.edges) {
+      const a = byId(e.from.node), b = byId(e.to.node); if (!a || !b || !ids.has(a.id) || !ids.has(b.id) || a === b) continue;
+      const pa = portPos(a, e.from.port), pb = portPos(b, e.to.port), i = axis === 'y' ? 1 : 0;
+      const d = pb[i] - pa[i], run = Math.abs(pb[1 - i] - pa[1 - i]);
+      if (Math.abs(d) > .5 && Math.abs(d) <= TOL && run > Math.abs(d) * 2) cons.push({a, b, pa:e.from.port, pb:e.to.port});
+    }
+    const fixed = new Set();
+    const order = [...ns].sort((p, q) => deg(q.id) - deg(p.id));
+    for (const seed of order) {
+      if (fixed.has(seed.id) || !cons.some(c => c.a === seed || c.b === seed)) continue;
+      fixed.add(seed.id);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const c of cons) {
+          const fa = fixed.has(c.a.id), fb = fixed.has(c.b.id); if (fa === fb) continue;
+          const [src, sp, dst, dp] = fa ? [c.a, c.pa, c.b, c.pb] : [c.b, c.pb, c.a, c.pa];
+          const i = axis === 'y' ? 1 : 0, d = portPos(src, sp)[i] - portPos(dst, dp)[i];
+          if (Math.abs(d) <= TOL) { if (axis === 'y') dst.y += d; else dst.x += d; }
+          fixed.add(dst.id); changed = true;
+        }
+      }
+    }
+    // Unconnected near-misses: shapes whose centres are within 12 px line up on the larger shape's centre
+    const free = ns.filter(n => !fixed.has(n.id));
+    for (const n of free) {
+      const c = axis === 'y' ? n.y + n.h / 2 : n.x + n.w / 2;
+      const m = ns.filter(o => o !== n && Math.abs((axis === 'y' ? o.y + o.h / 2 : o.x + o.w / 2) - c) <= 12 && Math.abs((axis === 'y' ? o.y + o.h / 2 : o.x + o.w / 2) - c) > .5)
+        .sort((p, q) => (q.w * q.h) - (p.w * p.h))[0];
+      if (m && m.w * m.h >= n.w * n.h) { if (axis === 'y') n.y += (m.y + m.h / 2) - c; else n.x += (m.x + m.w / 2) - c; }
+    }
+  }
+  // Snap to the grid as a group per connected run so aligned ports stay aligned
+  for (const n of ns) { const cx = n.x + n.w / 2, cy = n.y + n.h / 2; n.x = snap(cx) - n.w / 2; n.y = snap(cy) - n.h / 2; }
+  if (JSON.stringify(ns.map(n => [n.x, n.y])) === before) { toast('Already tidy'); render(); return; }
+  commit(); renderProps(); toast(sel.size ? 'Tidied the selection' : 'Tidied the drawing');
+}
+
 function overlaySVG() {
   if (!drag) return '';
+  if (drag.mode === 'move' && drag.guides && drag.guides.length && !drag.target) return guidesSVG(drag.guides);
   if (drag.mode === 'move' && drag.target) {
     const e = edgeById(drag.target), p = e && route(e);
     return p ? `<path d="${pathD(p, null)}" fill="none" stroke="#0ea5e9" stroke-width="${8 / view.k}" stroke-opacity=".35" stroke-linecap="round" stroke-linejoin="round"/>` : '';
@@ -1356,7 +1463,7 @@ svg.addEventListener('pointerdown', ev => {
   hideEditor(true);
   ev.preventDefault(); // keeps focus (and the inline editor) from being stolen by the canvas
   const w = toWorld(ev.clientX, ev.clientY), t = ev.target;
-  if (ev.button === 1 || (ev.button === 0 && spaceDown)) {
+  if (ev.button === 1 || ev.button === 2 || (ev.button === 0 && spaceDown)) {
     drag = {mode:'pan', sx:ev.clientX, sy:ev.clientY, vx:view.x, vy:view.y};
     svg.classList.add('panning'); svg.setPointerCapture(ev.pointerId); ev.preventDefault(); return;
   }
@@ -1410,7 +1517,12 @@ svg.addEventListener('pointermove', ev => {
     const dx = w.x - drag.start.x, dy = w.y - drag.start.y;
     if (!drag.moved && Math.hypot(dx, dy) * view.k < 3) return;
     drag.moved = true;
-    for (const [id, [ox, oy]] of Object.entries(drag.orig)) { const n = byId(id); n.x = snap(ox + dx); n.y = snap(oy + dy); }
+    // Grid-snap the first shape, then let smart guides pull the whole group into line with its neighbours
+    const ids0 = Object.keys(drag.orig), [ax, ay] = drag.orig[ids0[0]];
+    let mx = snap(ax + dx) - ax, my = snap(ay + dy) - ay;
+    drag.guides = [];
+    if (settings.guides !== false && !ev.altKey) { const g = smartGuides(ids0, mx, my); mx = g.dx; my = g.dy; drag.guides = g.lines; }
+    for (const [id, [ox, oy]] of Object.entries(drag.orig)) { const n = byId(id); n.x = ox + mx; n.y = oy + my; }
     // A single, unconnected inline part dragged over a line gets inserted into it on drop
     drag.target = null;
     const ids = Object.keys(drag.orig);
@@ -1465,9 +1577,10 @@ svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
 svg.addEventListener('wheel', ev => {
   ev.preventDefault();
-  if (ev.ctrlKey || ev.metaKey) zoomAt(Math.exp(-ev.deltaY * .01), ev.clientX, ev.clientY);
-  else if (ev.altKey) zoomAt(Math.exp(-ev.deltaY * .002), ev.clientX, ev.clientY);
-  else { view.x -= ev.shiftKey ? ev.deltaY : ev.deltaX; view.y -= ev.shiftKey ? 0 : ev.deltaY; render(); hideEditor(true); }
+  // Scroll zooms around the pointer (pinch arrives as ctrl+wheel); Shift+scroll pans sideways
+  if (ev.shiftKey) { view.x -= ev.deltaY || ev.deltaX; render(); hideEditor(true); return; }
+  const dy = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaMode === 2 ? ev.deltaY * 400 : ev.deltaY;
+  zoomAt(Math.exp(-dy * (ev.ctrlKey || ev.metaKey ? .01 : .0018)), ev.clientX, ev.clientY);
 }, {passive:false});
 svg.addEventListener('contextmenu', ev => ev.preventDefault());
 
@@ -1525,6 +1638,7 @@ document.addEventListener('keydown', ev => {
   else if (ev.key === 'Enter' || ev.key === 'F2') { if (sel.size === 1) { const id = [...sel][0]; openEditor(byId(id) ? 'node' : 'edge', id); ev.preventDefault(); } }
   else if (k === 'f' && !mod) fitView();
   else if ((k === '[' || k === ']') && !mod && stepsOf().length) stepNav(k === ']' ? 1 : -1);
+  else if (k === 't' && ev.shiftKey && !mod) tidyUp();
   else if (k === 'r' && !mod && ev.shiftKey) { const es = [...sel].map(edgeById).filter(Boolean); if (es.length) { es.forEach(reverseEdge); commit(); renderProps(); } }
   else if (k === 'r' && !mod) rotateSel();
   else if (ev.key === 'PageDown' && (mod || ev.altKey)) { ev.preventDefault(); gotoSheet(doc.cur + 1); }
@@ -1676,9 +1790,11 @@ function renderProps() {
         check('data-dflag="showLineData"', doc.showLineData, 'Line tags &amp; tubing specs') +
         check('data-dflag="showSizes"', doc.showSizes, 'Connector sizes') +
         check('data-dflag="showEqData"', doc.showEqData, 'Equipment design data') +
-        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) + layersEditor() + stepsEditor() +
+        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) +
+        field('Layout', check('id="sGuides"', settings.guides !== false, 'Smart guides while dragging (hold Alt to ignore)') + `<div class="btns"><button class="btn" data-act="tidy" title="Straighten nearly-straight lines and line up near-aligned shapes (Shift+T)">Tidy up drawing</button></div>`) +
+        layersEditor() + stepsEditor() +
       field('Line type for new connections', lineTypeRows(settings.line, 'data-defline')) +
-      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — scroll or <kbd>Space</kbd>+drag. <b>Zoom</b> — <kbd>Ctrl</kbd>+scroll.</div>`;
+      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — right-drag (or <kbd>Space</kbd>+drag). <b>Zoom</b> — scroll.<br><b>Tidy</b> — <kbd>Shift</kbd>+<kbd>T</kbd> straightens lines; pink guides help line shapes up while dragging (hold <kbd>Alt</kbd> to ignore).</div>`;
   } else if (nodes.length === 1 && !edges.length) {
     const n = nodes[0], s = SYM[n.type];
     h = `<h3>${esc(s.name)}</h3><div class="sub">${esc(s.cat)}</div>`;
@@ -1754,7 +1870,8 @@ function renderProps() {
   } else {
     h = `<h3>${items.length} items selected</h3><div class="sub">${nodes.length} shapes · ${edges.length} lines</div>`;
     if (nodes.length > 1) h += field('Align', `<div class="btns" style="margin:0">${[['left','Left'],['center','Center'],['right','Right'],['top','Top'],['middle','Middle'],['bottom','Bottom']].map(([v,l]) => `<button class="btn" data-align="${v}">${l}</button>`).join('')}</div>`) +
-      field('Distribute', `<div class="btns" style="margin:0"><button class="btn" data-align="dh">Horizontally</button><button class="btn" data-align="dv">Vertically</button></div>`);
+      field('Distribute', `<div class="btns" style="margin:0"><button class="btn" data-align="dh">Horizontally</button><button class="btn" data-align="dv">Vertically</button></div>`) +
+      field('Clean up', `<div class="btns" style="margin:0"><button class="btn" data-act="tidy" title="Straighten nearly-straight lines and line up near-aligned shapes (Shift+T)">Tidy up selection</button></div>`);
     if (edges.length) h += allDatalists() + arrowRow(edges.every(x => (x.arrow || 'end') === (edges[0].arrow || 'end')) ? edges[0].arrow || 'end' : '') + field('Set line type', lineTypeRows('', 'data-etype')) +
       sect('Set for all selected lines', `<div class="row2">${field('Spec / class', inp('data-bulk="spec"', '', 'SS-BPE-SF4', 'dl-spec'))}${field('Service', inp('data-bulk="service"', '', 'WFI', 'dl-svc'))}</div><div class="row2">${field('Tubing material', inp('data-bulk="tubeMat"', '', 'TPE', 'dl-tmat'))}${field('Tubing ID', inp('data-bulk="tubeId"', '', '⅜"', 'dl-tid'))}</div>`, false);
     h += `<div class="btns">${nodes.some(canRotate) ? '<button class="btn" data-act="rot">Rotate 90°</button>' : ''}<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Delete</button></div>`;
@@ -1862,6 +1979,7 @@ P.addEventListener('click', ev => {
   if (t.dataset.arrow) { for (const id of items) { const e = edgeById(id); if (e) e.arrow = t.dataset.arrow; } commit(); renderProps(); return; }
   if (t.dataset.etype) { for (const id of items) { const e = edgeById(id); if (e) e.type = t.dataset.etype; } commit(); renderProps(); return; }
   const a = t.dataset.act;
+  if (a === 'tidy') { tidyUp(); return; }
   if (a && a.startsWith('step')) { stepAction(a); return; }
   if (a && a.startsWith('lay')) { layerAction(a); return; }
   if (a === 'del') deleteSel();
@@ -1917,7 +2035,7 @@ document.addEventListener('click', ev => {
 document.addEventListener('change', ev => { const id = ev.target.dataset && ev.target.dataset.lshow; if (!id) return; if (ev.target.checked) hiddenLayers.delete(id); else hiddenLayers.add(id); refreshLayers(true); });
 function setStepView(id) { stepView[doc.sheets[doc.cur].id] = id; sel.clear(); hideEditor(false); render(); renderProps(); renderTabs(); }
 function stepNav(d) { const ss = stepsOf(), i = stepIdx(curStep()); const j = i < 0 ? (d > 0 ? 0 : -1) : i + d; setStepView(j < 0 ? '' : ss[Math.min(j, ss.length - 1)].id); }
-document.addEventListener('change', ev => { if (ev.target.id === 'stepSel') setStepView(ev.target.value); });
+document.addEventListener('change', ev => { if (ev.target.id === 'stepSel') setStepView(ev.target.value); if (ev.target.id === 'sGuides') { settings.guides = ev.target.checked; } });
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-stepnav]'); if (b) stepNav(+b.dataset.stepnav); });
 function gotoSheet(i, focusId) {
   if (i < 0 || i >= doc.sheets.length) return;
@@ -2715,7 +2833,7 @@ function openTemplates(isNew) {
   });
 }
 function openHelp() {
-  const rows = [['Drag symbol → canvas','Add shape'],['Drop valve / fitting on a line','Insert it inline (splits the line)'],['R','Rotate 90°'],['Drag from blue port','Connect two shapes'],['Double-click / Enter','Edit label'],['Drag empty canvas','Box-select'],['Shift + click','Add to selection'],['Space + drag, or scroll','Pan'],['Ctrl + scroll / pinch','Zoom'],['F','Fit diagram to screen'],['Delete','Delete selection'],['Ctrl + C / V / D','Copy / paste / duplicate'],['Ctrl + Z / Y','Undo / redo'],['Arrow keys (+Shift)','Nudge 10 px (50 px)'],['Ctrl + S','Save & export']];
+  const rows = [['Drag symbol → canvas','Add shape'],['Drop valve / fitting on a line','Insert it inline (splits the line)'],['R','Rotate 90°'],['Drag from blue port','Connect two shapes'],['Double-click / Enter','Edit label'],['Drag empty canvas','Box-select'],['Shift + click','Add to selection'],['Right-drag (or Space + drag)','Pan'],['Scroll / pinch','Zoom'],['Shift + scroll','Pan sideways'],['Shift + T','Tidy up (selection or whole sheet)'],['Alt while dragging','Ignore smart guides'],['F','Fit diagram to screen'],['Delete','Delete selection'],['Ctrl + C / V / D','Copy / paste / duplicate'],['Ctrl + Z / Y','Undo / redo'],['Arrow keys (+Shift)','Nudge 10 px (50 px)'],['Ctrl + S','Save & export']];
   openModal('Keyboard & mouse', `<table class="keys">${rows.map(([a,b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table><p class="note">Line types follow common PFD conventions: solid = process stream, solid cyan = single-use tubing (closed SU flowpath), dashed blue = utility, dash-dot teal = CIP/SIP, long-dash purple = manual or mobile-vessel transfer, brown = waste, dotted grey = control signal. Cleanroom zones use EU GMP Annex 1 grades.</p><p class="note"><b>Pidgeon</b> is created by Minhazuddin Mohammed (MinaryBytes) and is free and open source under the MIT licence. It runs entirely in your browser: drawings are stored on this device and in the files you save, never uploaded. It is not validated for GMP use — treat drawings as drafts until issued through your controlled document system. Source code and issues: <a href="${REPO_URL}" target="_blank" rel="noopener">${REPO_URL.replace('https://', '')}</a></p>`);
 }
 
