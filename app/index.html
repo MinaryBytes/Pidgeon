@@ -957,6 +957,10 @@ function edgeSVG(e, exp, H, pts, tagText = '') {
       o += horiz ? edgeText(x, y - 6, txt, L.color === '#1f2a37' ? '#334155' : L.color) : edgeText(x - 6, y, txt, L.color === '#1f2a37' ? '#334155' : L.color, 'middle', -90);
     }
   }
+  if (arrow === 'mid') {
+    const [ax, ay, aa] = pointAt(pts, LEN * (e.label || e.cMid ? .22 : .5)), deg = (aa * 180 / Math.PI).toFixed(1);
+    o += `<path d="M-4.5,-4.5 L4.5,0 L-4.5,4.5 Z" fill="${L.color}" stroke="${L.color}" stroke-width="1" stroke-linejoin="round" transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)}) rotate(${deg})"/>`;
+  }
   if (e.label) {
     const m = midpoint(pts), tw = e.label.length * 6.1 + 12;
     o += `<rect x="${m[0]-tw/2}" y="${m[1]-9}" width="${tw}" height="18" rx="3" fill="#fff" stroke="${L.color}" stroke-width=".8"/>` + T(m[0], m[1]+4, e.label, {size:10, weight:500, fill:L.color === INK ? INK : L.color});
@@ -1144,8 +1148,8 @@ function insertInline(n, x, y) {
   const [ix, iy] = portPos({x:0, y:0, w:n.w, h:n.h}, pin), [ox, oy] = portPos({x:0, y:0, w:n.w, h:n.h}, pout);
   n.x = Math.round(px - (ix + ox) / 2); n.y = Math.round(py - (iy + oy) / 2);
   const arr = e.arrow || 'end';
-  const e1 = {...e, id:uid(), to:{node:n.id, port:pin}, cTo:undefined, cToSize:undefined, toNoz:undefined, arrow: arr === 'start' || arr === 'both' ? 'start' : 'none'};
-  const e2 = {...e, id:uid(), from:{node:n.id, port:pout}, cFrom:undefined, cFromSize:undefined, fromNoz:undefined, label:'', cMid:undefined, cMidSize:undefined, arrow: arr === 'end' || arr === 'both' ? 'end' : 'none'};
+  const e1 = {...e, id:uid(), to:{node:n.id, port:pin}, cTo:undefined, cToSize:undefined, toNoz:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'start' || arr === 'both' ? 'start' : 'none'};
+  const e2 = {...e, id:uid(), from:{node:n.id, port:pout}, cFrom:undefined, cFromSize:undefined, fromNoz:undefined, label:'', cMid:undefined, cMidSize:undefined, arrow: arr === 'mid' ? 'mid' : arr === 'end' || arr === 'both' ? 'end' : 'none'};
   doc.edges.splice(doc.edges.indexOf(e), 1, e1, e2);
   return true;
 }
@@ -1411,6 +1415,7 @@ document.addEventListener('keydown', ev => {
   else if (ev.key === 'Escape') { sel.clear(); render(); renderProps(); }
   else if (ev.key === 'Enter' || ev.key === 'F2') { if (sel.size === 1) { const id = [...sel][0]; openEditor(byId(id) ? 'node' : 'edge', id); ev.preventDefault(); } }
   else if (k === 'f' && !mod) fitView();
+  else if (k === 'r' && !mod && ev.shiftKey) { const es = [...sel].map(edgeById).filter(Boolean); if (es.length) { es.forEach(reverseEdge); commit(); renderProps(); } }
   else if (k === 'r' && !mod) rotateSel();
   else if (ev.key === 'PageDown' && (mod || ev.altKey)) { ev.preventDefault(); gotoSheet(doc.cur + 1); }
   else if (ev.key === 'PageUp' && (mod || ev.altKey)) { ev.preventDefault(); gotoSheet(doc.cur - 1); }
@@ -1516,6 +1521,8 @@ const ILOC = [['field','Field mounted (no line)'],['main','Main control room (so
 const FAILS = [['FC','FC — fail closed'],['FO','FO — fail open'],['FL','FL — fail last position'],['FI','FI — fail indeterminate']];
 const STERIL = [['Gamma','Gamma irradiated'],['X-ray','X-ray irradiated'],['Autoclave','Autoclaved'],['EtO','Ethylene oxide'],['Non-sterile','Non-sterile / bioburden-controlled']];
 const isEquip = s => s.text === 'below' && s.cls !== 'part' && s.cls !== 'valve' && !['junction','drain','sample'].includes(s.id);
+const ARROWS = [['end','→','Arrow at the end'],['start','←','Arrow at the start'],['both','↔','Arrows at both ends'],['mid','▸','Flow arrow mid-line'],['none','—','No arrow']];
+const arrowRow = cur => field('Flow arrow', `<div class="btns" style="margin:0">${ARROWS.map(([v, g, t]) => `<button class="btn ${cur === v ? 'on' : ''}" data-arrow="${v}" title="${t}" aria-pressed="${cur === v}" style="min-width:34px">${g}</button>`).join('')}<button class="btn" data-act="swap" title="Swap the line's start and end (also flips connection ends and nozzle IDs)">Reverse flow ⇄</button></div>`);
 function renderProps() {
   if (edTarget) return;
   const items = [...sel], mode = doc.mode || 'pfd';
@@ -1531,7 +1538,7 @@ function renderProps() {
         check('data-dflag="showEqData"', doc.showEqData, 'Equipment design data') +
         (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) +
       field('Line type for new connections', lineTypeRows(settings.line, 'data-defline')) +
-      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — scroll or <kbd>Space</kbd>+drag. <b>Zoom</b> — <kbd>Ctrl</kbd>+scroll.</div>`;
+      `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — scroll or <kbd>Space</kbd>+drag. <b>Zoom</b> — <kbd>Ctrl</kbd>+scroll.</div>`;
   } else if (nodes.length === 1 && !edges.length) {
     const n = nodes[0], s = SYM[n.type];
     h = `<h3>${esc(s.name)}</h3><div class="sub">${esc(s.cat)}</div>`;
@@ -1581,7 +1588,8 @@ function renderProps() {
     const sig = LINES[e.type]?.sig;
     h = `<h3>Line</h3><div class="sub">${esc(nm(a))} → ${esc(nm(b))}${lineTag(e) ? ' · ' + esc(lineTag(e)) : ''}</div>` + allDatalists() +
       field('Stream label', `<input data-e="label" value="${esc(e.label)}" placeholder="e.g. Clarified harvest">`) +
-      sect(`Line type — ${esc(LINES[e.type]?.name || '')}`, lineTypeRows(e.type, 'data-etype') + field('Arrow', sel1('data-e="arrow"', [['end','At end →'],['start','At start ←'],['both','Both ↔'],['none','None']], e.arrow || 'end')), mode === 'pfd') +
+      arrowRow(e.arrow || 'end') +
+      sect(`Line type — ${esc(LINES[e.type]?.name || '')}`, lineTypeRows(e.type, 'data-etype'), mode === 'pfd') +
       (sig ? '' : sect('Line data (P&amp;ID)',
         `<div class="row2">${field('Size', inp('data-e="size"', e.size, '1.5"', 'dl-pipe'))}${field('Service', inp('data-e="service"', e.service, 'WFI', 'dl-svc'))}</div>` +
         `<div class="row2">${field('Line no.', inp('data-e="lineNo"', e.lineNo, '1001') )}${field('Pipe class / spec', inp('data-e="spec"', e.spec, 'SS-BPE-SF4', 'dl-spec'))}</div>` +
@@ -1596,13 +1604,13 @@ function renderProps() {
         field(lab, `<select data-e="${k}">${connOptions(e[k])}</select>` + (e[k] ? `<input data-e="${k}Size" list="${sizeList(e[k])}" value="${esc(e[k + 'Size'])}" placeholder="Size (pick or type)" style="margin-top:6px">` : ''))).join('') +
         check('data-dflag="showSizes"', doc.showSizes, 'Show connector sizes on diagram'), true) +
       check('data-dflag="showLineData"', doc.showLineData, 'Show line tags &amp; tubing specs on diagram') +
-      `<div class="btns"><button class="btn" data-act="swap">Reverse direction</button><button class="btn danger" data-act="del">Delete</button></div>` +
+      `<div class="btns"><button class="btn danger" data-act="del">Delete</button></div>` +
       `<p class="note">Drag the round end-handles to reattach the line to another shape or nozzle.</p>`;
   } else {
     h = `<h3>${items.length} items selected</h3><div class="sub">${nodes.length} shapes · ${edges.length} lines</div>`;
     if (nodes.length > 1) h += field('Align', `<div class="btns" style="margin:0">${[['left','Left'],['center','Center'],['right','Right'],['top','Top'],['middle','Middle'],['bottom','Bottom']].map(([v,l]) => `<button class="btn" data-align="${v}">${l}</button>`).join('')}</div>`) +
       field('Distribute', `<div class="btns" style="margin:0"><button class="btn" data-align="dh">Horizontally</button><button class="btn" data-align="dv">Vertically</button></div>`);
-    if (edges.length) h += allDatalists() + field('Set line type', lineTypeRows('', 'data-etype')) +
+    if (edges.length) h += allDatalists() + arrowRow(edges.every(x => (x.arrow || 'end') === (edges[0].arrow || 'end')) ? edges[0].arrow || 'end' : '') + field('Set line type', lineTypeRows('', 'data-etype')) +
       sect('Set for all selected lines', `<div class="row2">${field('Spec / class', inp('data-bulk="spec"', '', 'SS-BPE-SF4', 'dl-spec'))}${field('Service', inp('data-bulk="service"', '', 'WFI', 'dl-svc'))}</div><div class="row2">${field('Tubing material', inp('data-bulk="tubeMat"', '', 'TPE', 'dl-tmat'))}${field('Tubing ID', inp('data-bulk="tubeId"', '', '⅜"', 'dl-tid'))}</div>`, false);
     h += `<div class="btns">${nodes.some(canRotate) ? '<button class="btn" data-act="rot">Rotate 90°</button>' : ''}<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Delete</button></div>`;
   }
@@ -1652,19 +1660,21 @@ function setMode(m) {
   buildPalette($('#palSearch').value);
   commit(); renderProps();
 }
+function reverseEdge(e) { [e.from, e.to] = [e.to, e.from]; [e.cFrom, e.cTo] = [e.cTo, e.cFrom]; [e.cFromSize, e.cToSize] = [e.cToSize, e.cFromSize]; [e.fromNoz, e.toNoz] = [e.toNoz, e.fromNoz]; }
 P.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline]'); if (!t) return;
+  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline],[data-arrow]'); if (!t) return;
   const items = [...sel];
   if (t.dataset.defline) { settings.line = t.dataset.defline; $('#lineSel').value = settings.line; renderProps(); return; }
   if (t.dataset.fill) { const n = byId(items[0]); n.fill = t.dataset.fill === '#ffffff' ? undefined : t.dataset.fill; commit(); renderProps(); return; }
   if (t.dataset.align) { align(t.dataset.align); return; }
+  if (t.dataset.arrow) { for (const id of items) { const e = edgeById(id); if (e) e.arrow = t.dataset.arrow; } commit(); renderProps(); return; }
   if (t.dataset.etype) { for (const id of items) { const e = edgeById(id); if (e) e.type = t.dataset.etype; } commit(); renderProps(); return; }
   const a = t.dataset.act;
   if (a === 'del') deleteSel();
   else if (a === 'rot') rotateSel();
   else if (a === 'dup') { copySel(); clip.n = 0; paste(); }
   else if (a === 'front' || a === 'back') { const n = byId(items[0]); doc.nodes = doc.nodes.filter(x => x !== n); a === 'front' ? doc.nodes.push(n) : doc.nodes.unshift(n); commit(); }
-  else if (a === 'swap') { const e = edgeById(items[0]); [e.from, e.to] = [e.to, e.from]; [e.cFrom, e.cTo] = [e.cTo, e.cFrom]; [e.cFromSize, e.cToSize] = [e.cToSize, e.cFromSize]; [e.fromNoz, e.toNoz] = [e.toNoz, e.fromNoz]; commit(); renderProps(); }
+  else if (a === 'swap') { for (const e of items.map(edgeById).filter(Boolean)) reverseEdge(e); commit(); renderProps(); }
   else if (a === 'mkpair') { const n = byId(items[0]); createMatchingOffpage(n); commit(); renderProps(); toast('Matching connector placed on the linked sheet'); }
   else if (a === 'golink') { const n = byId(items[0]), li = linkInfo(n); if (li && li.si >= 0) gotoSheet(li.si, li.target?.id); }
   else if (a === 'autoline') { const e = edgeById(items[0]); e.lineNo = nextLineNo(); e.service = e.service || DEF_SERVICE[e.type] || 'PR'; commit(); renderProps(); }
