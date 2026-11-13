@@ -31,6 +31,7 @@
   <a href="#pfd">Process flow diagrams</a>
   <a href="#pid">P&amp;IDs</a>
   <a href="#su">Single-use assemblies</a>
+  <a href="#layers">Layers</a>
   <a href="#steps">Steps</a>
   <a href="#sheets">Sheets</a>
   <a href="#export">Saving and exporting</a>
@@ -73,6 +74,9 @@
 
 <h2 id="su">Single-use assemblies</h2>
 <p>Draw the assembly with bags, fittings, clamps and connectors, then select each tubing run to enter material, ID, OD and length. Place an <b>Assembly boundary</b> around the parts with its part number and sterilization method, and add a <b>Bill of materials</b>: it counts everything inside the boundary, groups connectors by size and totals tubing length by material and size.</p>
+
+<h2 id="layers">Layers</h2>
+<p>To keep P&amp;ID and single-use content (or anything else) in one drawing and switch between them, open <b>Layers</b> in the Diagram panel (click empty canvas). Add standard layers such as P&amp;ID, Single-use, Instruments &amp; control or Utilities, or make your own. Layers apply to every sheet. Everything starts on all layers; select items and click layer chips to choose which layers they belong to. An item can be on several layers, e.g. a transmitter that should show in both the P&amp;ID and the single-use view. Use the <b>Layers</b> button under the drawing to show or hide layers, or <i>only</i> to show one. Lines hide when either end is hidden. Anything drawn while a layer is hidden goes on the visible layers. The PDF export can print the visible layers, every layer, or one page per layer; PNG, SVG and DXF follow what is shown.</p>
 
 <h2 id="steps">Steps (component flow by step)</h2>
 <p>For a Single Use Flow Diagram, open <b>Steps</b> in the Diagram panel (click empty canvas) and add your own steps in order, e.g. Set-up, Media fill, Sampling, Inoculation, Transfer. Each sheet has its own list. Select parts or tubing and pick the steps they are present in. Use the step bar under the drawing, or <kbd>[</kbd> and <kbd>]</kbd>, to view one step at a time: items from other steps are shown faded (or hidden). The combined view marks limited items with their step numbers, e.g. S1–3. Anything you draw while a step is shown starts in that step and the ones after it.</p>

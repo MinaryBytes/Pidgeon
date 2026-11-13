@@ -55,6 +55,14 @@ header select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;bac
 .ehit{cursor:pointer}
 .handle{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:nwse-resize}
 .eend{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:crosshair}
+.layerbar{position:relative}.layerbar+.stepbar{margin-left:6px}
+.lbtn{border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;color:#334155}.lbtn b{color:var(--accent)}
+.lpop{position:fixed;min-width:240px;max-height:60vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);padding:6px;z-index:20;font-weight:500;color:#1f2937}
+.lrow{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;cursor:pointer}.lrow:hover{background:#f1f5f9}
+.lrow i{width:10px;height:10px;border-radius:3px;flex:none}.lrow span{flex:1}
+.solo{border:none;background:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0 2px}.solo:hover{color:var(--accent)}
+.lfoot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px}.lfoot .btn{width:100%}
+.ldot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:0}
 .stepbar{margin-left:auto;align-self:center;display:flex;align-items:center;gap:4px;padding:0 4px 3px;font-size:12px;color:#5b21b6;font-weight:600;flex:none}
 .stepbar select{font-size:12px;padding:3px 6px;border:1px solid #c4b5fd;border-radius:6px;background:#faf5ff;color:#3b0764;max-width:220px}
 .sbtn{border:1px solid #c4b5fd;background:#fff;color:#5b21b6;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1}
@@ -792,8 +800,25 @@ const stepsOf = () => (doc.sheets && doc.sheets[doc.cur] && doc.sheets[doc.cur].
 const curStep = () => { const v = doc.sheets ? stepView[doc.sheets[doc.cur].id] : ''; return v && stepsOf().some(s => s.id === v) ? v : ''; };
 const activeStep = () => forceStep !== null ? forceStep : curStep();
 const inStep = (x, st) => !st || !x || !x.steps || x.steps.includes(st);
-const nodeVis = (n, st = activeStep()) => inStep(n, st);
-const edgeVis = (e, st = activeStep()) => inStep(e, st) && inStep(byId(e.from.node), st) && inStep(byId(e.to.node), st);
+/* Layers: user-defined for the whole drawing (doc.layers = [{id, name}]). An item with no layer list is on
+   every layer. Which layers are shown is a view setting (hiddenLayers, not saved); forceLayers lets export
+   render a given set. */
+const LAYER_PRESETS = ['P&ID', 'Single-use', 'Process', 'Instruments & control', 'Utilities', 'Electrical & signals', 'Notes & annotations'];
+const LAYER_COLORS = ['#2563eb', '#0891b2', '#1f2937', '#7c3aed', '#16a34a', '#ea580c', '#64748b', '#db2777', '#ca8a04'];
+const hiddenLayers = new Set();
+let forceLayers = null;
+const layersOf = () => doc.layers || [];
+const layerColor = id => LAYER_COLORS[Math.max(0, layersOf().findIndex(l => l.id === id)) % LAYER_COLORS.length];
+const layerOn = id => forceLayers ? forceLayers.includes(id) : !hiddenLayers.has(id);
+const inLayers = x => !x || !x.layers || !layersOf().length || x.layers.some(layerOn);
+const nodeVis = (n, st = activeStep()) => inStep(n, st) && inLayers(n);
+const edgeVis = (e, st = activeStep()) => inStep(e, st) && inStep(byId(e.from.node), st) && inStep(byId(e.to.node), st) && edgeLayerVis(e);
+const edgeLayerVis = e => inLayers(e) && inLayers(byId(e.from.node)) && inLayers(byId(e.to.node));
+// Hidden because of a layer (fade only if asked) or because of the step view (fade by default)?
+const ghostOk = (layerVis) => !layerVis ? doc.layerGhost === true : doc.stepGhost !== false;
+function setLayers(x, ids) { const all = layersOf().map(l => l.id), k = all.filter(id => ids.includes(id)); if (!k.length || k.length === all.length) delete x.layers; else x.layers = k; }
+// New items drawn while some layers are hidden go on the visible ones, so they don't vanish
+function stampLayers(x) { const ls = layersOf(); if (!ls.length || !hiddenLayers.size) return; const vis = ls.filter(l => !hiddenLayers.has(l.id)).map(l => l.id); if (vis.length) setLayers(x, vis); }
 const stepIdx = id => stepsOf().findIndex(s => s.id === id);
 // "1–3, 5" from a list of step ids
 function stepRange(ids) {
@@ -804,7 +829,7 @@ function stepRange(ids) {
 // Normalise a step list: every step (or none left) means "all steps"
 function setSteps(x, ids) { const all = stepsOf().map(s => s.id), k = all.filter(id => ids.includes(id)); if (!k.length || k.length === all.length) delete x.steps; else x.steps = k; }
 // New items drawn while a step is in view start in that step and stay for the steps after it
-function stampSteps(x) { const st = curStep(); if (st) setSteps(x, stepsOf().slice(stepIdx(st)).map(s => s.id)); }
+function stampSteps(x) { const st = curStep(); if (st) setSteps(x, stepsOf().slice(stepIdx(st)).map(s => s.id)); stampLayers(x); }
 const STEP_COLOR = '#7c3aed';
 function stepBadge(ids, x, y) { const t = 'S' + stepRange(ids), w = t.length * 5.6 + 8; return `<g pointer-events="none"><rect x="${(x - w/2).toFixed(1)}" y="${(y - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" rx="6.5" fill="#fff" stroke="${STEP_COLOR}" stroke-width="1"/>${T(x, y + 3, t, {size:8, weight:700, fill:STEP_COLOR})}</g>`; }
 
@@ -1072,12 +1097,12 @@ function tagPlan(routes) {
 const ghostWrap = svg => svg ? `<g opacity=".13" pointer-events="none">${svg}</g>` : '';
 function edgesSVG(exp) {
   const H = doc.jumps !== false && doc.mode === 'pid' ? [] : null;
-  const st = activeStep(), ghost = doc.stepGhost !== false, badges = !st && stepsOf().length && doc.stepNums !== false;
+  const st = activeStep(), badges = !st && stepsOf().length && doc.stepNums !== false;
   const routes = doc.edges.map(route), plan = tagPlan(routes);
   let o = '', g = '';
   for (let i = 0; i < doc.edges.length; i++) {
     const e = doc.edges[i], pts = routes[i]; if (!pts) continue;
-    if (!edgeVis(e, st)) { if (ghost) g += edgeSVG(e, true, null, pts, ''); continue; }
+    if (!edgeVis(e, st)) { if (ghostOk(edgeLayerVis(e))) g += edgeSVG(e, true, null, pts, ''); continue; }
     o += edgeSVG(e, exp, H, pts, plan.get(e.id) || '');
     if (badges && e.steps) { const [bx, by] = pointAt(pts, pathLen(pts) * .62); o += stepBadge(e.steps, bx, by - 11); }
     if (H) for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i][1] - pts[i-1][1]) < .5) H.push({y:pts[i][1], x1:Math.min(pts[i][0], pts[i-1][0]), x2:Math.max(pts[i][0], pts[i-1][0])});
@@ -1086,8 +1111,8 @@ function edgesSVG(exp) {
 }
 const isBack = n => n.type === 'zone' || n.type === 'assembly';
 function layers(exp) {
-  const st = activeStep(), ghost = doc.stepGhost !== false, badges = !st && stepsOf().length && doc.stepNums !== false;
-  const draw = list => { let o = '', g = ''; for (const n of list) { if (!nodeVis(n, st)) { if (ghost) g += nodeSVG(n, true); continue; } o += nodeSVG(n, exp); if (badges && n.steps) o += stepBadge(n.steps, n.x + n.w / 2, n.y - 12); } return ghostWrap(g) + o; };
+  const st = activeStep(), badges = !st && stepsOf().length && doc.stepNums !== false;
+  const draw = list => { let o = '', g = ''; for (const n of list) { if (!nodeVis(n, st)) { if (ghostOk(inLayers(n))) g += nodeSVG(n, true); continue; } o += nodeSVG(n, exp); if (badges && n.steps) o += stepBadge(n.steps, n.x + n.w / 2, n.y - 12); } return ghostWrap(g) + o; };
   return {z: draw(doc.nodes.filter(isBack)), e: edgesSVG(exp), n: draw(doc.nodes.filter(n => !isBack(n)))};
 }
 function overlaySVG() {
@@ -1169,6 +1194,8 @@ function loadDoc(d, fit = true) {
   }
   d.nodes = d.sheets[d.cur].nodes; d.edges = d.sheets[d.cur].edges;
   for (const k in sheetViews) delete sheetViews[k];
+  hiddenLayers.clear();
+  if (!Array.isArray(d.layers) || !d.layers.length) delete d.layers;
   doc = {...d, title: d.title || 'Untitled diagram'};
   renderTabs();
   sel.clear(); hist = []; hi = -1;
@@ -1614,6 +1641,21 @@ function stepsEditor() {
     (ss.length ? check('data-dflag="stepGhost"', doc.stepGhost !== false, 'Show items from other steps faded') + check('data-dflag="stepNums"', doc.stepNums !== false, 'Step numbers on the combined view') +
       `<p class="note">Pick a step in the bar under the drawing (or press <kbd>[</kbd> <kbd>]</kbd>). Select parts or lines to choose which steps they appear in; anything drawn while a step is shown starts in that step and the ones after it.</p>` : ''), ss.length > 0 || doc.mode === 'su');
 }
+function layersEditor() {
+  const ls = layersOf(), names = ls.map(l => l.name);
+  const presets = LAYER_PRESETS.filter(p => !names.includes(p));
+  return sect(`Layers${ls.length ? ` (${ls.length})` : ''}`,
+    (ls.length ? ls.map((l, k) => `<div class="step-row"><b><span class="ldot" style="background:${layerColor(l.id)}"></span></b><input data-layername="${l.id}" value="${esc(l.name)}"><button class="btn" data-act="laymv:${l.id}:-1" title="Move up" ${k === 0 ? 'disabled' : ''}>↑</button><button class="btn" data-act="laymv:${l.id}:1" title="Move down" ${k === ls.length - 1 ? 'disabled' : ''}>↓</button><button class="btn" data-act="laydel:${l.id}" title="Remove layer (items stay)">✕</button></div>`).join('')
+      : `<p class="note" style="margin-top:0">Put P&amp;ID and single-use content (or anything else) on layers, then show or hide them from the Layers button under the drawing. Layers apply to every sheet; items start on all layers until you assign them.</p>`) +
+    (presets.length ? `<div class="field"><label>Add a standard layer</label><div class="chips">${presets.map(p => `<button class="chip" data-act="layadd:${esc(p)}">+ ${esc(p)}</button>`).join('')}</div></div>` : '') +
+    `<div class="btns"><button class="btn" data-act="layadd">+ Custom layer</button></div>` +
+    (ls.length ? check('data-dflag="layerGhost"', doc.layerGhost === true, 'Show hidden layers faded instead of hiding them') : ''), ls.length > 0);
+}
+function layerChips(xs) {
+  const ls = layersOf(); if (!ls.length || !xs.length) return '';
+  return sect('Layers', `<div class="chips">${ls.map(l => { const c = xs.filter(x => !x.layers || x.layers.includes(l.id)).length; return `<button class="chip ${c === xs.length ? 'on' : c ? 'part' : ''}" data-ilayer="${l.id}"><span class="ldot" style="background:${layerColor(l.id)}"></span>${esc(l.name)}</button>`; }).join('')}</div>` +
+    `<div class="btns"><button class="btn" data-ilayer="*all">All layers</button></div>`, true);
+}
 function stepChips(xs) {
   const ss = stepsOf(); if (!ss.length || !xs.length) return '';
   const cur = curStep();
@@ -1633,7 +1675,7 @@ function renderProps() {
         check('data-dflag="showLineData"', doc.showLineData, 'Line tags &amp; tubing specs') +
         check('data-dflag="showSizes"', doc.showSizes, 'Connector sizes') +
         check('data-dflag="showEqData"', doc.showEqData, 'Equipment design data') +
-        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) + stepsEditor() +
+        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) + layersEditor() + stepsEditor() +
       field('Line type for new connections', lineTypeRows(settings.line, 'data-defline')) +
       `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — scroll or <kbd>Space</kbd>+drag. <b>Zoom</b> — <kbd>Ctrl</kbd>+scroll.</div>`;
   } else if (nodes.length === 1 && !edges.length) {
@@ -1716,7 +1758,7 @@ function renderProps() {
       sect('Set for all selected lines', `<div class="row2">${field('Spec / class', inp('data-bulk="spec"', '', 'SS-BPE-SF4', 'dl-spec'))}${field('Service', inp('data-bulk="service"', '', 'WFI', 'dl-svc'))}</div><div class="row2">${field('Tubing material', inp('data-bulk="tubeMat"', '', 'TPE', 'dl-tmat'))}${field('Tubing ID', inp('data-bulk="tubeId"', '', '⅜"', 'dl-tid'))}</div>`, false);
     h += `<div class="btns">${nodes.some(canRotate) ? '<button class="btn" data-act="rot">Rotate 90°</button>' : ''}<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Delete</button></div>`;
   }
-  if (items.length) h += stepChips([...nodes.filter(n => !['titleblock','legend','bom','revtable'].includes(n.type)), ...edges]);
+  if (items.length) { const xs = [...nodes.filter(n => !['titleblock','legend','bom','revtable'].includes(n.type)), ...edges]; h += layerChips(xs) + stepChips(xs); }
   P.innerHTML = h;
 }
 function revEditor() {
@@ -1746,6 +1788,7 @@ P.addEventListener('change', ev => {
     commit(); renderProps(); return;
   }
   if (t.dataset.dflag) { const f = t.dataset.dflag; doc[f] = ['jumps','stepGhost','stepNums'].includes(f) ? (t.checked ? undefined : false) : (t.checked || undefined); commit(); renderProps(); return; }
+  if (t.dataset.layername) { const l = layersOf().find(x => x.id === t.dataset.layername); if (l) { l.name = t.value.trim() || l.name; commit(); renderTabs(); } return; }
   if (t.dataset.stepname) { const s = stepsOf().find(x => x.id === t.dataset.stepname); if (s) { s.name = t.value.trim() || s.name; commit(); renderTabs(); } return; }
   commit();
   // choosing / clearing a connection type shows or hides its size field; instrument kind etc. redraw the panel
@@ -1764,6 +1807,19 @@ function setMode(m) {
   buildPalette($('#palSearch').value);
   commit(); renderProps();
 }
+function layerAction(a) {
+  const ls = doc.layers = doc.layers || [];
+  const i1 = a.indexOf(':'), arg = i1 < 0 ? '' : a.slice(i1 + 1);
+  if (a.startsWith('layadd')) ls.push({id:uid(), name: arg || `Layer ${ls.length + 1}`});
+  else if (a.startsWith('laymv:')) { const [id, d] = arg.split(':'); const i = ls.findIndex(l => l.id === id), j = i + +d; if (i >= 0 && j >= 0 && j < ls.length) [ls[i], ls[j]] = [ls[j], ls[i]]; }
+  else if (a.startsWith('laydel:')) {
+    const rest = ls.filter(l => l.id !== arg);
+    forEachSheet(() => { for (const x of [...doc.nodes, ...doc.edges]) if (x.layers) { const k = x.layers.filter(v => v !== arg); if (!k.length || k.length === rest.length) delete x.layers; else x.layers = k; } });
+    doc.layers = rest; if (!rest.length) delete doc.layers; hiddenLayers.delete(arg);
+  }
+  commit(); renderProps(); renderTabs();
+  if (a === 'layadd') { const ins = P.querySelectorAll('[data-layername]'); const last = ins[ins.length - 1]; if (last) { last.focus(); last.select(); } }
+}
 function stepAction(a) {
   const sh = doc.sheets[doc.cur], ss = sh.steps = sh.steps || [];
   const [, id, d] = a.split(':');
@@ -1780,11 +1836,18 @@ function stepAction(a) {
 }
 function reverseEdge(e) { [e.from, e.to] = [e.to, e.from]; [e.cFrom, e.cTo] = [e.cTo, e.cFrom]; [e.cFromSize, e.cToSize] = [e.cToSize, e.cFromSize]; [e.fromNoz, e.toNoz] = [e.toNoz, e.fromNoz]; }
 P.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline],[data-arrow],[data-istep]'); if (!t) return;
+  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline],[data-arrow],[data-istep],[data-ilayer]'); if (!t) return;
   const items = [...sel];
   if (t.dataset.defline) { settings.line = t.dataset.defline; $('#lineSel').value = settings.line; renderProps(); return; }
   if (t.dataset.fill) { const n = byId(items[0]); n.fill = t.dataset.fill === '#ffffff' ? undefined : t.dataset.fill; commit(); renderProps(); return; }
   if (t.dataset.align) { align(t.dataset.align); return; }
+  if (t.dataset.ilayer) {
+    const v = t.dataset.ilayer, all = layersOf().map(l => l.id);
+    const xs = items.map(id => byId(id) || edgeById(id)).filter(x => x && !['titleblock','legend','bom','revtable'].includes(x.type));
+    const allOn = v !== '*all' && xs.every(x => !x.layers || x.layers.includes(v));
+    for (const x of xs) { const have = x.layers ? [...x.layers] : all; setLayers(x, v === '*all' ? all : allOn ? have.filter(id => id !== v) : [...have, v]); }
+    commit(); render(); renderProps(); return;
+  }
   if (t.dataset.istep) {
     const v = t.dataset.istep, ss = stepsOf().map(s => s.id), cur = curStep();
     const xs = items.map(id => byId(id) || edgeById(id)).filter(x => x && !['titleblock','legend','bom','revtable'].includes(x.type));
@@ -1799,6 +1862,7 @@ P.addEventListener('click', ev => {
   if (t.dataset.etype) { for (const id of items) { const e = edgeById(id); if (e) e.type = t.dataset.etype; } commit(); renderProps(); return; }
   const a = t.dataset.act;
   if (a && a.startsWith('step')) { stepAction(a); return; }
+  if (a && a.startsWith('lay')) { layerAction(a); return; }
   if (a === 'del') deleteSel();
   else if (a === 'rot') rotateSel();
   else if (a === 'dup') { copySel(); clip.n = 0; paste(); }
@@ -1823,7 +1887,7 @@ P.addEventListener('click', ev => {
 function renderTabs() {
   const t = $('#tabs'); if (!t) return;
   t.innerHTML = doc.sheets.map((sh, i) => `<div class="tab ${i === doc.cur ? 'on' : ''}" data-sheet="${i}" title="Double-click to rename"><span>${i + 1}. ${esc(sh.name)}</span>${i === doc.cur ? `<button class="tmenu" data-smenu="${i}" title="Sheet options">⋯</button>` : ''}</div>`).join('') +
-    `<button class="tab-add" id="addSheet" title="Add sheet">＋ Sheet</button>` + stepBarHTML();
+    `<button class="tab-add" id="addSheet" title="Add sheet">＋ Sheet</button>` + layerBarHTML() + stepBarHTML();
 }
 function stepBarHTML() {
   const ss = stepsOf(); if (!ss.length) return '';
@@ -1832,6 +1896,24 @@ function stepBarHTML() {
     `<select id="stepSel">${[['', 'All steps (combined)'], ...ss.map((s, k) => [s.id, `${k + 1}. ${s.name}`])].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` +
     `<button class="sbtn" data-stepnav="1" title="Next step ( ] )" ${i === ss.length - 1 ? 'disabled' : ''}>›</button></div>`;
 }
+function layerBarHTML() {
+  const ls = layersOf(); if (!ls.length) return '';
+  const on = ls.filter(l => !hiddenLayers.has(l.id)).length;
+  return `<div class="stepbar layerbar" style="${stepsOf().length ? '' : ''}"><button class="lbtn" id="layerBtn" title="Show or hide layers">Layers <b>${on}/${ls.length}</b> ▾</button>` +
+    `<div class="lpop" id="layerPop" hidden>${ls.map(l => `<label class="lrow"><input type="checkbox" data-lshow="${l.id}" ${hiddenLayers.has(l.id) ? '' : 'checked'}><i style="background:${layerColor(l.id)}"></i><span>${esc(l.name)}</span><button class="solo" data-lsolo="${l.id}" title="Show only this layer">only</button></label>`).join('')}` +
+    `<div class="lfoot"><button class="btn" data-lsolo="*">Show all</button></div></div></div>`;
+}
+// The tab strip scrolls, so the popover is fixed-positioned above its button
+function placePop() { const p = $('#layerPop'), b = $('#layerBtn'); if (!p || !b || p.hidden) return; const r = b.getBoundingClientRect(); p.style.left = Math.max(8, Math.min(r.left, innerWidth - 260)) + 'px'; p.style.bottom = (innerHeight - r.top + 6) + 'px'; }
+function refreshLayers(keepOpen) { sel.clear(); render(); renderProps(); renderTabs(); if (keepOpen) { const p = $('#layerPop'); if (p) { p.hidden = false; placePop(); } } }
+document.addEventListener('click', ev => {
+  const pop = $('#layerPop');
+  if (ev.target.closest('#layerBtn')) { if (pop) { pop.hidden = !pop.hidden; placePop(); } return; }
+  const solo = ev.target.closest('[data-lsolo]');
+  if (solo) { ev.preventDefault(); hiddenLayers.clear(); if (solo.dataset.lsolo !== '*') layersOf().forEach(l => l.id !== solo.dataset.lsolo && hiddenLayers.add(l.id)); refreshLayers(true); return; }
+  if (pop && !pop.hidden && !ev.target.closest('#layerPop')) pop.hidden = true;
+});
+document.addEventListener('change', ev => { const id = ev.target.dataset && ev.target.dataset.lshow; if (!id) return; if (ev.target.checked) hiddenLayers.delete(id); else hiddenLayers.add(id); refreshLayers(true); });
 function setStepView(id) { stepView[doc.sheets[doc.cur].id] = id; sel.clear(); hideEditor(false); render(); renderProps(); renderTabs(); }
 function stepNav(d) { const ss = stepsOf(), i = stepIdx(curStep()); const j = i < 0 ? (d > 0 ? 0 : -1) : i + d; setStepView(j < 0 ? '' : ss[Math.min(j, ss.length - 1)].id); }
 document.addEventListener('change', ev => { if (ev.target.id === 'stepSel') setStepView(ev.target.value); });
@@ -2084,7 +2166,7 @@ function allChecks() {
 function focusItem(id, sheet) {
   if (sheet !== undefined && sheet !== doc.cur) { closeModal(); gotoSheet(sheet); }
   const n = byId(id), e = edgeById(id); let c;
-  if ((n && !nodeVis(n)) || (e && !edgeVis(e))) { stepView[doc.sheets[doc.cur].id] = ''; renderTabs(); }
+  if ((n && !nodeVis(n)) || (e && !edgeVis(e))) { stepView[doc.sheets[doc.cur].id] = ''; hiddenLayers.clear(); renderTabs(); }
   if (n) c = [n.x + n.w/2, n.y + n.h/2]; else if (e) { const p = route(e); if (p) c = midpoint(p); }
   if (!c) return;
   const r = svg.getBoundingClientRect(); view.k = Math.max(view.k, 1); view.x = r.width/2 - c[0]*view.k; view.y = r.height/2 - c[1]*view.k;
@@ -2116,8 +2198,9 @@ const slug = () => (doc.title || 'pfd').toLowerCase().replace(/[^a-z0-9]+/g, '-'
 function exportSVG() {
   const b = bounds() || {x:0, y:0, w:400, h:300}, pad = 30;
   const x = Math.floor(b.x - pad), y = Math.floor(b.y - pad), W = Math.ceil(b.w + pad*2), H = Math.ceil(b.h + pad*2);
-  const L = layers(true), st = activeStep();
-  const cap = st ? T(x + 14, y + 20, `STEP ${stepIdx(st) + 1} OF ${stepsOf().length} · ${stepsOf()[stepIdx(st)].name}`, {size:12, weight:700, anchor:'start', fill:STEP_COLOR}) : '';
+  const L = layers(true), st = activeStep(), ls = layersOf(), shown = ls.filter(l => layerOn(l.id));
+  const capT = [st ? `STEP ${stepIdx(st) + 1} OF ${stepsOf().length} · ${stepsOf()[stepIdx(st)].name}` : '', ls.length && shown.length < ls.length ? `LAYER${shown.length === 1 ? '' : 'S'}: ${shown.map(l => l.name).join(', ') || 'none'}` : ''].filter(Boolean).join('   |   ');
+  const cap = capT ? T(x + 14, y + 20, capT, {size:12, weight:700, anchor:'start', fill:STEP_COLOR}) : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${x} ${y} ${W} ${H}"><defs>${defsSVG(false)}</defs><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#ffffff"/>${L.z}${L.e}${L.n}${cap}</svg>`;
 }
 function toPNG(svgText, scale = 2) {
@@ -2176,7 +2259,13 @@ const svgForPdf = t => t.replace(/<marker id="(arrS?)-(\w+)"([^>]*?)markerWidth=
 const PAGES = {fit:['Fit to drawing'], a3:['A3', 1190.55, 841.89], tabloid:['11 × 17 (ANSI B)', 1224, 792], a4:['A4', 841.89, 595.28], letter:['Letter', 792, 612]};
 function offscreen() { const h = document.createElement('div'); h.style.cssText = 'position:fixed;left:-20000px;top:0;visibility:hidden;pointer-events:none'; document.body.appendChild(h); return h; }
 // Pages for one sheet: the combined view and/or one page per step (sheets without steps get one page)
-function sheetPages(stepMode) {
+function sheetPages(stepMode, layerMode = 'view') {
+  const ls = layersOf();
+  if (ls.length && layerMode !== 'view') {
+    const sets = layerMode === 'each' ? ls.map(l => [l.id]) : [ls.map(l => l.id)], keep = forceLayers, out = [];
+    try { for (const set of sets) { forceLayers = set; out.push(...sheetPages(stepMode)); } } finally { forceLayers = keep; }
+    return out;
+  }
   const ss = stepsOf(); if (!ss.length || stepMode === 'view') return [sheetSVG()];
   const out = [], keep = forceStep;
   try {
@@ -2185,10 +2274,10 @@ function sheetPages(stepMode) {
   } finally { forceStep = keep; }
   return out;
 }
-async function exportPDF(scope, page, stepMode = 'view') {
+async function exportPDF(scope, page, stepMode = 'view', layerMode = 'view') {
   await loadPdfLibs();
   const {jsPDF} = window.jspdf;
-  const sheets = (scope === 'all' ? forEachSheet(() => sheetPages(stepMode)) : [sheetPages(stepMode)]).flat();
+  const sheets = (scope === 'all' ? forEachSheet(() => sheetPages(stepMode, layerMode)) : [sheetPages(stepMode, layerMode)]).flat();
   const host = offscreen(); let pdf = null;
   try {
     for (const sh of sheets) {
@@ -2376,6 +2465,7 @@ async function openExport() {
       <div class="exp-opts">
         <label>Sheets ${sel1('id="xScope"', [['all', `All sheets (${n})`], ['cur', `This sheet only (${doc.cur + 1}. ${esc(doc.sheets[doc.cur].name)})`]], n > 1 ? 'all' : 'cur')}</label>
         <label>PDF paper ${sel1('id="xPage"', Object.entries(PAGES).map(([k, v]) => [k, v[0]]), 'tabloid')}</label>
+        ${layersOf().length ? `<label>Layers in PDF ${sel1('id="xLayers"', [['view','Visible layers (as shown)'],['each','One page per layer'],['all','All layers']], 'view')}</label>` : ''}
         ${forEachSheet(() => stepsOf().length).some(Boolean) ? `<label>Steps in PDF ${sel1('id="xSteps"', [['both','Combined view + one page per step'],['each','One page per step'],['combined','Combined view only'],['view','As shown on screen']], 'both')}</label>` : ''}
       </div>
       <div class="btns"><button class="btn primary" id="xPdf">Download PDF</button><button class="btn primary" id="xDxf">Download DXF</button><span id="xMsg" class="note" style="margin:0;align-self:center"></span></div>
@@ -2389,7 +2479,7 @@ async function openExport() {
     <p class="note"><b>PDF</b> is vector, one page per sheet, with the drawing scaled to the paper. <b>DXF</b> (AutoCAD R12) opens in AutoCAD, BricsCAD, DraftSight and LibreCAD: one file per sheet, millimetres at 1 px = 0.265 mm, layers by object type (EQUIPMENT, VALVES, INSTRUMENTS, LINE-…, SU-PARTS, TITLE…), with CAD colours and linetypes. Inside claude.ai the DXF files arrive in a .zip. The .json file reopens the diagram here for editing (Open → choose file); work also autosaves in this browser.</p>`);
   const busy = async (btn, fn) => { const t = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing…'; $('#xMsg').textContent = '';
     try { await fn(); } catch (e) { $('#xMsg').textContent = 'Export failed: ' + (e.message || e); } finally { btn.disabled = false; btn.textContent = t; } };
-  $('#xPdf').onclick = e => busy(e.currentTarget, async () => download(await exportPDF($('#xScope').value === 'all' ? 'all' : 'cur', $('#xPage').value, $('#xSteps') ? $('#xSteps').value : 'view'), `${slug()}.pdf`));
+  $('#xPdf').onclick = e => busy(e.currentTarget, async () => download(await exportPDF($('#xScope').value === 'all' ? 'all' : 'cur', $('#xPage').value, $('#xSteps') ? $('#xSteps').value : 'view', $('#xLayers') ? $('#xLayers').value : 'view'), `${slug()}.pdf`));
   $('#xDxf').onclick = e => busy(e.currentTarget, () => exportDXF($('#xScope').value === 'all' ? 'all' : 'cur'));
   $('#xSvg').onclick = () => download(svgText, slug() + '.svg');
   $('#xCopySvg').onclick = e => copyText(svgText, e.currentTarget);
