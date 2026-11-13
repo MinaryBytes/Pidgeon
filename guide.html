@@ -31,6 +31,7 @@
   <a href="#pfd">Process flow diagrams</a>
   <a href="#pid">P&amp;IDs</a>
   <a href="#su">Single-use assemblies</a>
+  <a href="#steps">Steps</a>
   <a href="#sheets">Sheets</a>
   <a href="#export">Saving and exporting</a>
   <a href="#reports">Lists and drawing check</a>
@@ -73,6 +74,10 @@
 <h2 id="su">Single-use assemblies</h2>
 <p>Draw the assembly with bags, fittings, clamps and connectors, then select each tubing run to enter material, ID, OD and length. Place an <b>Assembly boundary</b> around the parts with its part number and sterilization method, and add a <b>Bill of materials</b>: it counts everything inside the boundary, groups connectors by size and totals tubing length by material and size.</p>
 
+<h2 id="steps">Steps (component flow by step)</h2>
+<p>For a disposable component flow diagram, open <b>Steps</b> in the Diagram panel (click empty canvas) and add your own steps in order, e.g. Set-up, Media fill, Sampling, Inoculation, Transfer. Each sheet has its own list. Select parts or tubing and pick the steps they are present in. Use the step bar under the drawing, or <kbd>[</kbd> and <kbd>]</kbd>, to view one step at a time: items from other steps are shown faded (or hidden). The combined view marks limited items with their step numbers, e.g. S1–3. Anything you draw while a step is shown starts in that step and the ones after it.</p>
+<p>The PDF export can give the combined view, one page per step, or both. <b>Reports → Component steps</b> lists every part and line with the steps it is present in. The BOM counts each part once.</p>
+
 <h2 id="sheets">Sheets</h2>
 <p>Use <b>＋ Sheet</b> at the bottom of the canvas to add a sheet; the title block comes with it. The <b>⋯</b> menu on the current tab renames, duplicates, reorders or deletes it. To continue a line onto another sheet, select an <i>Off-page connector</i>, choose the sheet it continues on and click <b>Create matching connector</b>. Each connector then shows where it leads, and <b>Go to sheet</b> jumps there.</p>
 
@@ -93,6 +98,7 @@
   <tr><td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo</td></tr>
   <tr><td><kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>V</kbd> / <kbd>D</kbd></td><td>Copy / paste / duplicate</td></tr>
   <tr><td><kbd>R</kbd></td><td>Rotate 90°</td></tr>
+  <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Previous / next step</td></tr>
   <tr><td><kbd>Shift</kbd> + <kbd>R</kbd></td><td>Reverse the selected lines (flips the flow arrow)</td></tr>
   <tr><td><kbd>F</kbd></td><td>Fit drawing to screen</td></tr>
   <tr><td><kbd>Space</kbd> + drag, or scroll</td><td>Pan</td></tr>

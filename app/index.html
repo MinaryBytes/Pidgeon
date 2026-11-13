@@ -55,6 +55,16 @@ header select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;bac
 .ehit{cursor:pointer}
 .handle{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:nwse-resize}
 .eend{fill:#fff;stroke:var(--sel);stroke-width:1.5;cursor:crosshair}
+.stepbar{margin-left:auto;align-self:center;display:flex;align-items:center;gap:4px;padding:0 4px 3px;font-size:12px;color:#5b21b6;font-weight:600;flex:none}
+.stepbar select{font-size:12px;padding:3px 6px;border:1px solid #c4b5fd;border-radius:6px;background:#faf5ff;color:#3b0764;max-width:220px}
+.sbtn{border:1px solid #c4b5fd;background:#fff;color:#5b21b6;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1}
+.sbtn:disabled{opacity:.35;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 9px;font-size:12px;cursor:pointer;color:#374151}
+.chip.on{background:#f3e8ff;border-color:#a78bfa;color:#5b21b6;font-weight:600}
+.chip.part{background:repeating-linear-gradient(45deg,#f3e8ff,#f3e8ff 4px,#fff 4px,#fff 8px);border-color:#c4b5fd}
+.step-row{display:flex;gap:4px;align-items:center;margin-bottom:5px}.step-row b{width:18px;color:#5b21b6;font-size:12px}.step-row input{flex:1;min-width:0}
+.step-row .btn{padding:3px 7px}
 #tabs{position:absolute;left:0;right:0;bottom:0;height:34px;display:flex;align-items:flex-end;gap:2px;padding:0 8px;background:linear-gradient(to top,#eef0f3,#eef0f3 80%,transparent);overflow-x:auto;z-index:5}
 .tab{display:flex;align-items:center;gap:6px;padding:5px 12px 6px;border:1px solid var(--line);border-bottom:none;border-radius:7px 7px 0 0;background:#e9ecef;cursor:pointer;white-space:nowrap;font-size:12px;color:#4b5563;user-select:none}
 .tab:hover{background:#f8fafc}
@@ -699,7 +709,7 @@ function nearestPort(n, x, y) {
 function nodeAt(x, y, exclude) {
   for (let i = doc.nodes.length - 1; i >= 0; i--) {
     const n = doc.nodes[i];
-    if (n.type === 'zone' || n.type === 'assembly' || n.id === exclude || !portsOf(n).length) continue;
+    if (n.type === 'zone' || n.type === 'assembly' || n.id === exclude || !portsOf(n).length || !nodeVis(n)) continue;
     if (x >= n.x - 10 && x <= n.x + n.w + 10 && y >= n.y - 10 && y <= n.y + n.h + 10) return n;
   }
   return null;
@@ -770,6 +780,33 @@ function nearOnPath(pts, x, y) {
   return {d:best, t:at};
 }
 function toWorld(cx, cy) { const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.x)/view.k, y:(cy - r.top - view.y)/view.k}; }
+
+/* ---------- Steps ----------
+   A sheet may define its own ordered steps (sh.steps = [{id, name}]), e.g. Set-up → Media fill → Sampling →
+   Inoculation → Transfer. Every shape and line can be limited to some steps (x.steps = [ids]); no list means
+   it is present in every step. The step being viewed is per sheet and not saved (stepView); forceStep lets
+   export render a given step ('' = combined view). */
+const stepView = {};
+let forceStep = null;
+const stepsOf = () => (doc.sheets && doc.sheets[doc.cur] && doc.sheets[doc.cur].steps) || [];
+const curStep = () => { const v = doc.sheets ? stepView[doc.sheets[doc.cur].id] : ''; return v && stepsOf().some(s => s.id === v) ? v : ''; };
+const activeStep = () => forceStep !== null ? forceStep : curStep();
+const inStep = (x, st) => !st || !x || !x.steps || x.steps.includes(st);
+const nodeVis = (n, st = activeStep()) => inStep(n, st);
+const edgeVis = (e, st = activeStep()) => inStep(e, st) && inStep(byId(e.from.node), st) && inStep(byId(e.to.node), st);
+const stepIdx = id => stepsOf().findIndex(s => s.id === id);
+// "1–3, 5" from a list of step ids
+function stepRange(ids) {
+  const ix = ids.map(stepIdx).filter(i => i >= 0).sort((a, b) => a - b).map(i => i + 1), out = [];
+  for (let i = 0; i < ix.length; i++) { let j = i; while (j + 1 < ix.length && ix[j + 1] === ix[j] + 1) j++; out.push(j > i ? `${ix[i]}–${ix[j]}` : `${ix[i]}`); i = j; }
+  return out.join(', ');
+}
+// Normalise a step list: every step (or none left) means "all steps"
+function setSteps(x, ids) { const all = stepsOf().map(s => s.id), k = all.filter(id => ids.includes(id)); if (!k.length || k.length === all.length) delete x.steps; else x.steps = k; }
+// New items drawn while a step is in view start in that step and stay for the steps after it
+function stampSteps(x) { const st = curStep(); if (st) setSteps(x, stepsOf().slice(stepIdx(st)).map(s => s.id)); }
+const STEP_COLOR = '#7c3aed';
+function stepBadge(ids, x, y) { const t = 'S' + stepRange(ids), w = t.length * 5.6 + 8; return `<g pointer-events="none"><rect x="${(x - w/2).toFixed(1)}" y="${(y - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" rx="6.5" fill="#fff" stroke="${STEP_COLOR}" stroke-width="1"/>${T(x, y + 3, t, {size:8, weight:700, fill:STEP_COLOR})}</g>`; }
 
 /* ---------- Rendering ---------- */
 function defsSVG(withGrid) {
@@ -843,7 +880,7 @@ function bodySVG(n) {
     return `<rect x="0" y="0" width="${w}" height="100"/><path d="M0,40 H${w} M0,70 H${w} M${c},40 V100 M${2*c},40 V100" fill="none" stroke-width="1"/>` +
       T(8, 15, MODES[doc.mode || 'pfd'].doc.toUpperCase(), {size:8, anchor:'start', fill:'#6b7280'}) +
       T(w - 8, 15, `SHEET ${doc.cur + 1} OF ${doc.sheets.length}`, {size:8, weight:700, anchor:'end', fill:'#374151'}) +
-      T(8, 32, clipT(doc.title + (doc.sheets.length > 1 ? ' — ' + doc.sheets[doc.cur].name : ''), w/7.4), {size:13, weight:700, anchor:'start'}) +
+      T(8, 32, clipT(doc.title + (doc.sheets.length > 1 ? ' — ' + doc.sheets[doc.cur].name : '') + (activeStep() ? ` — Step ${stepIdx(activeStep()) + 1}: ${stepsOf()[stepIdx(activeStep())].name}` : ''), w/7.4), {size:13, weight:700, anchor:'start'}) +
       cell(0,40,'DRAWING NO.',m.docno) + cell(c,40,'REV',last ? last.rev : m.rev) + cell(2*c,40,'DATE',last ? last.date : m.date) +
       cell(0,70,'SITE / AREA',m.site) + cell(c,70,'PREPARED BY',m.by) + cell(2*c,70,'STATUS',m.status);
   }
@@ -1032,24 +1069,26 @@ function tagPlan(routes) {
   }
   return plan;
 }
+const ghostWrap = svg => svg ? `<g opacity=".13" pointer-events="none">${svg}</g>` : '';
 function edgesSVG(exp) {
   const H = doc.jumps !== false && doc.mode === 'pid' ? [] : null;
+  const st = activeStep(), ghost = doc.stepGhost !== false, badges = !st && stepsOf().length && doc.stepNums !== false;
   const routes = doc.edges.map(route), plan = tagPlan(routes);
-  let o = '';
+  let o = '', g = '';
   for (let i = 0; i < doc.edges.length; i++) {
     const e = doc.edges[i], pts = routes[i]; if (!pts) continue;
+    if (!edgeVis(e, st)) { if (ghost) g += edgeSVG(e, true, null, pts, ''); continue; }
     o += edgeSVG(e, exp, H, pts, plan.get(e.id) || '');
+    if (badges && e.steps) { const [bx, by] = pointAt(pts, pathLen(pts) * .62); o += stepBadge(e.steps, bx, by - 11); }
     if (H) for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i][1] - pts[i-1][1]) < .5) H.push({y:pts[i][1], x1:Math.min(pts[i][0], pts[i-1][0]), x2:Math.max(pts[i][0], pts[i-1][0])});
   }
-  return o;
+  return ghostWrap(g) + o;
 }
 const isBack = n => n.type === 'zone' || n.type === 'assembly';
 function layers(exp) {
-  return {
-    z: doc.nodes.filter(isBack).map(n => nodeSVG(n, exp)).join(''),
-    e: edgesSVG(exp),
-    n: doc.nodes.filter(n => !isBack(n)).map(n => nodeSVG(n, exp)).join('')
-  };
+  const st = activeStep(), ghost = doc.stepGhost !== false, badges = !st && stepsOf().length && doc.stepNums !== false;
+  const draw = list => { let o = '', g = ''; for (const n of list) { if (!nodeVis(n, st)) { if (ghost) g += nodeSVG(n, true); continue; } o += nodeSVG(n, exp); if (badges && n.steps) o += stepBadge(n.steps, n.x + n.w / 2, n.y - 12); } return ghostWrap(g) + o; };
+  return {z: draw(doc.nodes.filter(isBack)), e: edgesSVG(exp), n: draw(doc.nodes.filter(n => !isBack(n)))};
 }
 function overlaySVG() {
   if (!drag) return '';
@@ -1126,6 +1165,7 @@ function loadDoc(d, fit = true) {
     sh.nodes = (sh.nodes || []).filter(n => SYM[n.type]);
     const ids = new Set(sh.nodes.map(n => n.id));
     sh.edges = (sh.edges || []).filter(e => ids.has(e.from?.node) && ids.has(e.to?.node));
+    if (!Array.isArray(sh.steps) || !sh.steps.length) delete sh.steps;
   }
   d.nodes = d.sheets[d.cur].nodes; d.edges = d.sheets[d.cur].edges;
   for (const k in sheetViews) delete sheetViews[k];
@@ -1159,6 +1199,7 @@ function makeNode(type, cx, cy) {
 function nextAsm() { let m = 1000; for (const n of doc.nodes) { const v = parseInt(String(n.label || '').replace(/\D/g, ''), 10); if (n.type === 'assembly' && v > m) m = v; } return 'ASM-' + (m + 1); }
 function addNode(type, cx, cy, tryInline = true) {
   const n = makeNode(type, cx, cy);
+  stampSteps(n);
   const inserted = tryInline && SYM[type].inline && insertInline(n, cx, cy);
   if (isBack(n)) doc.nodes.unshift(n); else doc.nodes.push(n);
   sel = new Set([n.id]); commit(); renderProps();
@@ -1169,6 +1210,7 @@ function nearestEdge(x, y, tol, skipNode) {
   let best = null;
   for (const e of doc.edges) {
     if (skipNode && (e.from.node === skipNode || e.to.node === skipNode)) continue;
+    if (!edgeVis(e)) continue;
     const p = route(e); if (!p) continue; const r = nearOnPath(p, x, y); if (!best || r.d < best.r.d) best = {e, r, p};
   }
   return best && best.r.d <= tol ? best : null;
@@ -1361,8 +1403,8 @@ svg.addEventListener('pointermove', ev => {
     drag.cur = w;
     const x1 = Math.min(drag.start.x, w.x), x2 = Math.max(drag.start.x, w.x), y1 = Math.min(drag.start.y, w.y), y2 = Math.max(drag.start.y, w.y);
     sel = new Set(drag.base);
-    for (const n of doc.nodes) if (n.x >= x1 && n.y >= y1 && n.x + n.w <= x2 && n.y + n.h <= y2) sel.add(n.id);
-    for (const e of doc.edges) if (sel.has(e.from.node) && sel.has(e.to.node)) sel.add(e.id);
+    for (const n of doc.nodes) if (nodeVis(n) && n.x >= x1 && n.y >= y1 && n.x + n.w <= x2 && n.y + n.h <= y2) sel.add(n.id);
+    for (const e of doc.edges) if (edgeVis(e) && sel.has(e.from.node) && sel.has(e.to.node)) sel.add(e.id);
     render();
   }
 });
@@ -1385,7 +1427,7 @@ function endDrag(ev) {
       else {
         const e = {id:uid(), from:d.from, to:{node:t.id, port}, type:settings.line, label:'', arrow: LINES[settings.line].sig ? 'none' : 'end'};
         if (doc.mode === 'pid' && !LINES[e.type].sig) { e.lineNo = nextLineNo(); e.service = DEF_SERVICE[e.type] || 'PR'; }
-        doc.edges.push(e); sel = new Set([e.id]);
+        stampSteps(e); doc.edges.push(e); sel = new Set([e.id]);
       }
       commit(); renderProps();
     } else render();
@@ -1448,12 +1490,13 @@ document.addEventListener('keydown', ev => {
   else if (mod && k === 'x') { copySel(); deleteSel(); }
   else if (mod && k === 'v') { paste(); }
   else if (mod && k === 'd') { ev.preventDefault(); copySel(); clip.n = 0; paste(); }
-  else if (mod && k === 'a') { ev.preventDefault(); sel = new Set([...doc.nodes.map(n => n.id), ...doc.edges.map(e => e.id)]); render(); renderProps(); }
+  else if (mod && k === 'a') { ev.preventDefault(); sel = new Set([...doc.nodes.filter(n => nodeVis(n)).map(n => n.id), ...doc.edges.filter(e => edgeVis(e)).map(e => e.id)]); render(); renderProps(); }
   else if (mod && k === 's') { ev.preventDefault(); openExport(); }
   else if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); deleteSel(); }
   else if (ev.key === 'Escape') { sel.clear(); render(); renderProps(); }
   else if (ev.key === 'Enter' || ev.key === 'F2') { if (sel.size === 1) { const id = [...sel][0]; openEditor(byId(id) ? 'node' : 'edge', id); ev.preventDefault(); } }
   else if (k === 'f' && !mod) fitView();
+  else if ((k === '[' || k === ']') && !mod && stepsOf().length) stepNav(k === ']' ? 1 : -1);
   else if (k === 'r' && !mod && ev.shiftKey) { const es = [...sel].map(edgeById).filter(Boolean); if (es.length) { es.forEach(reverseEdge); commit(); renderProps(); } }
   else if (k === 'r' && !mod) rotateSel();
   else if (ev.key === 'PageDown' && (mod || ev.altKey)) { ev.preventDefault(); gotoSheet(doc.cur + 1); }
@@ -1562,6 +1605,21 @@ const STERIL = [['Gamma','Gamma irradiated'],['X-ray','X-ray irradiated'],['Auto
 const isEquip = s => s.text === 'below' && s.cls !== 'part' && s.cls !== 'valve' && !['junction','drain','sample'].includes(s.id);
 const ARROWS = [['end','→','Arrow at the end'],['start','←','Arrow at the start'],['both','↔','Arrows at both ends'],['mid','▸','Flow arrow mid-line'],['none','—','No arrow']];
 const arrowRow = cur => field('Flow arrow', `<div class="btns" style="margin:0">${ARROWS.map(([v, g, t]) => `<button class="btn ${cur === v ? 'on' : ''}" data-arrow="${v}" title="${t}" aria-pressed="${cur === v}" style="min-width:34px">${g}</button>`).join('')}<button class="btn" data-act="swap" title="Swap the line's start and end (also flips connection ends and nozzle IDs)">Reverse flow ⇄</button></div>`);
+function stepsEditor() {
+  const ss = stepsOf();
+  return sect(`Steps${ss.length ? ` (${ss.length})` : ''}`,
+    (ss.length ? ss.map((s, k) => `<div class="step-row"><b>${k + 1}</b><input data-stepname="${s.id}" value="${esc(s.name)}"><button class="btn" data-act="stepmv:${s.id}:-1" title="Move up" ${k === 0 ? 'disabled' : ''}>↑</button><button class="btn" data-act="stepmv:${s.id}:1" title="Move down" ${k === ss.length - 1 ? 'disabled' : ''}>↓</button><button class="btn" data-act="stepdel:${s.id}" title="Remove step">✕</button></div>`).join('')
+      : `<p class="note" style="margin-top:0">Track how parts and tubing come and go through a unit operation — e.g. Set-up, Media fill, Sampling, Inoculation, Transfer. Name your own steps; each sheet has its own list.</p>`) +
+    `<div class="btns"><button class="btn" data-act="stepadd">+ Add step</button></div>` +
+    (ss.length ? check('data-dflag="stepGhost"', doc.stepGhost !== false, 'Show items from other steps faded') + check('data-dflag="stepNums"', doc.stepNums !== false, 'Step numbers on the combined view') +
+      `<p class="note">Pick a step in the bar under the drawing (or press <kbd>[</kbd> <kbd>]</kbd>). Select parts or lines to choose which steps they appear in; anything drawn while a step is shown starts in that step and the ones after it.</p>` : ''), ss.length > 0 || doc.mode === 'su');
+}
+function stepChips(xs) {
+  const ss = stepsOf(); if (!ss.length || !xs.length) return '';
+  const cur = curStep();
+  return sect('Steps', `<div class="chips">${ss.map((s, k) => { const c = xs.filter(x => inStep(x, s.id)).length; return `<button class="chip ${c === xs.length ? 'on' : c ? 'part' : ''}" data-istep="${s.id}" title="${esc(s.name)}">${k + 1}. ${esc(s.name)}</button>`; }).join('')}</div>` +
+    `<div class="btns"><button class="btn" data-istep="*all">All steps</button>${cur ? `<button class="btn" data-istep="*from">From step ${stepIdx(cur) + 1} on</button><button class="btn" data-istep="*only">Only step ${stepIdx(cur) + 1}</button>` : ''}</div>`, true);
+}
 function renderProps() {
   if (edTarget) return;
   const items = [...sel], mode = doc.mode || 'pfd';
@@ -1575,7 +1633,7 @@ function renderProps() {
         check('data-dflag="showLineData"', doc.showLineData, 'Line tags &amp; tubing specs') +
         check('data-dflag="showSizes"', doc.showSizes, 'Connector sizes') +
         check('data-dflag="showEqData"', doc.showEqData, 'Equipment design data') +
-        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) +
+        (mode === 'pid' ? check('data-dflag="jumps"', doc.jumps !== false, 'Line jumps at crossings') : '')) + stepsEditor() +
       field('Line type for new connections', lineTypeRows(settings.line, 'data-defline')) +
       `<div class="tips"><b>Add</b> — drag a symbol from the left, or click it.<br><b>Inline parts</b> — drop a valve, fitting or filter <i>onto a line</i> to insert it.<br><b>Branch</b> — drop a <i>Junction</i> or tee on a line, then draw from its free port.<br><b>Connect</b> — drag from a blue port (small ports = extra nozzles).<br><b>Rotate</b> — <kbd>R</kbd>. <b>Reverse a line</b> — <kbd>Shift</kbd>+<kbd>R</kbd>. <b>Edit text</b> — double-click.<br><b>Pan</b> — scroll or <kbd>Space</kbd>+drag. <b>Zoom</b> — <kbd>Ctrl</kbd>+scroll.</div>`;
   } else if (nodes.length === 1 && !edges.length) {
@@ -1658,6 +1716,7 @@ function renderProps() {
       sect('Set for all selected lines', `<div class="row2">${field('Spec / class', inp('data-bulk="spec"', '', 'SS-BPE-SF4', 'dl-spec'))}${field('Service', inp('data-bulk="service"', '', 'WFI', 'dl-svc'))}</div><div class="row2">${field('Tubing material', inp('data-bulk="tubeMat"', '', 'TPE', 'dl-tmat'))}${field('Tubing ID', inp('data-bulk="tubeId"', '', '⅜"', 'dl-tid'))}</div>`, false);
     h += `<div class="btns">${nodes.some(canRotate) ? '<button class="btn" data-act="rot">Rotate 90°</button>' : ''}<button class="btn" data-act="dup">Duplicate</button><button class="btn danger" data-act="del">Delete</button></div>`;
   }
+  if (items.length) h += stepChips([...nodes.filter(n => !['titleblock','legend','bom','revtable'].includes(n.type)), ...edges]);
   P.innerHTML = h;
 }
 function revEditor() {
@@ -1686,7 +1745,8 @@ P.addEventListener('change', ev => {
     if (t.dataset.link === 'sheet') linkOffpage(n, t.value, null); else linkOffpage(n, n.link.sheet, t.value || null);
     commit(); renderProps(); return;
   }
-  if (t.dataset.dflag) { const f = t.dataset.dflag; doc[f] = f === 'jumps' ? (t.checked ? undefined : false) : (t.checked || undefined); commit(); renderProps(); return; }
+  if (t.dataset.dflag) { const f = t.dataset.dflag; doc[f] = ['jumps','stepGhost','stepNums'].includes(f) ? (t.checked ? undefined : false) : (t.checked || undefined); commit(); renderProps(); return; }
+  if (t.dataset.stepname) { const s = stepsOf().find(x => x.id === t.dataset.stepname); if (s) { s.name = t.value.trim() || s.name; commit(); renderTabs(); } return; }
   commit();
   // choosing / clearing a connection type shows or hides its size field; instrument kind etc. redraw the panel
   if (t.tagName === 'SELECT' && /^c(From|To|Mid)$/.test(t.dataset.e || '')) renderProps();
@@ -1704,16 +1764,41 @@ function setMode(m) {
   buildPalette($('#palSearch').value);
   commit(); renderProps();
 }
+function stepAction(a) {
+  const sh = doc.sheets[doc.cur], ss = sh.steps = sh.steps || [];
+  const [, id, d] = a.split(':');
+  if (a === 'stepadd') { ss.push({id:uid(), name:`Step ${ss.length + 1}`}); }
+  else if (a.startsWith('stepmv:')) { const i = ss.findIndex(s => s.id === id), j = i + +d; if (i >= 0 && j >= 0 && j < ss.length) [ss[i], ss[j]] = [ss[j], ss[i]]; }
+  else if (a.startsWith('stepdel:')) {
+    const rest = ss.filter(s => s.id !== id);
+    for (const x of [...doc.nodes, ...doc.edges]) if (x.steps) { const k = x.steps.filter(v => v !== id); if (!k.length || k.length === rest.length) delete x.steps; else x.steps = k; }
+    sh.steps = rest; if (!rest.length) delete sh.steps;
+    if (stepView[sh.id] === id) stepView[sh.id] = '';
+  }
+  commit(); renderProps(); renderTabs();
+  if (a === 'stepadd') { const ins = P.querySelectorAll('[data-stepname]'); const last = ins[ins.length - 1]; if (last) { last.focus(); last.select(); } }
+}
 function reverseEdge(e) { [e.from, e.to] = [e.to, e.from]; [e.cFrom, e.cTo] = [e.cTo, e.cFrom]; [e.cFromSize, e.cToSize] = [e.cToSize, e.cFromSize]; [e.fromNoz, e.toNoz] = [e.toNoz, e.fromNoz]; }
 P.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline],[data-arrow]'); if (!t) return;
+  const t = ev.target.closest('[data-fill],[data-act],[data-align],[data-etype],[data-defline],[data-arrow],[data-istep]'); if (!t) return;
   const items = [...sel];
   if (t.dataset.defline) { settings.line = t.dataset.defline; $('#lineSel').value = settings.line; renderProps(); return; }
   if (t.dataset.fill) { const n = byId(items[0]); n.fill = t.dataset.fill === '#ffffff' ? undefined : t.dataset.fill; commit(); renderProps(); return; }
   if (t.dataset.align) { align(t.dataset.align); return; }
+  if (t.dataset.istep) {
+    const v = t.dataset.istep, ss = stepsOf().map(s => s.id), cur = curStep();
+    const xs = items.map(id => byId(id) || edgeById(id)).filter(x => x && !['titleblock','legend','bom','revtable'].includes(x.type));
+    const allOn = v[0] !== '*' && xs.every(x => inStep(x, v));
+    for (const x of xs) {
+      const have = ss.filter(id => inStep(x, id));
+      setSteps(x, v === '*all' ? ss : v === '*from' ? ss.slice(stepIdx(cur)) : v === '*only' ? [cur] : allOn ? have.filter(id => id !== v) : [...have, v]);
+    }
+    commit(); renderProps(); return;
+  }
   if (t.dataset.arrow) { for (const id of items) { const e = edgeById(id); if (e) e.arrow = t.dataset.arrow; } commit(); renderProps(); return; }
   if (t.dataset.etype) { for (const id of items) { const e = edgeById(id); if (e) e.type = t.dataset.etype; } commit(); renderProps(); return; }
   const a = t.dataset.act;
+  if (a && a.startsWith('step')) { stepAction(a); return; }
   if (a === 'del') deleteSel();
   else if (a === 'rot') rotateSel();
   else if (a === 'dup') { copySel(); clip.n = 0; paste(); }
@@ -1738,8 +1823,19 @@ P.addEventListener('click', ev => {
 function renderTabs() {
   const t = $('#tabs'); if (!t) return;
   t.innerHTML = doc.sheets.map((sh, i) => `<div class="tab ${i === doc.cur ? 'on' : ''}" data-sheet="${i}" title="Double-click to rename"><span>${i + 1}. ${esc(sh.name)}</span>${i === doc.cur ? `<button class="tmenu" data-smenu="${i}" title="Sheet options">⋯</button>` : ''}</div>`).join('') +
-    `<button class="tab-add" id="addSheet" title="Add sheet">＋ Sheet</button>`;
+    `<button class="tab-add" id="addSheet" title="Add sheet">＋ Sheet</button>` + stepBarHTML();
 }
+function stepBarHTML() {
+  const ss = stepsOf(); if (!ss.length) return '';
+  const cur = curStep(), i = stepIdx(cur);
+  return `<div class="stepbar"><span>Step</span><button class="sbtn" data-stepnav="-1" title="Previous step ( [ )" ${!cur ? 'disabled' : ''}>‹</button>` +
+    `<select id="stepSel">${[['', 'All steps (combined)'], ...ss.map((s, k) => [s.id, `${k + 1}. ${s.name}`])].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` +
+    `<button class="sbtn" data-stepnav="1" title="Next step ( ] )" ${i === ss.length - 1 ? 'disabled' : ''}>›</button></div>`;
+}
+function setStepView(id) { stepView[doc.sheets[doc.cur].id] = id; sel.clear(); hideEditor(false); render(); renderProps(); renderTabs(); }
+function stepNav(d) { const ss = stepsOf(), i = stepIdx(curStep()); const j = i < 0 ? (d > 0 ? 0 : -1) : i + d; setStepView(j < 0 ? '' : ss[Math.min(j, ss.length - 1)].id); }
+document.addEventListener('change', ev => { if (ev.target.id === 'stepSel') setStepView(ev.target.value); });
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-stepnav]'); if (b) stepNav(+b.dataset.stepnav); });
 function gotoSheet(i, focusId) {
   if (i < 0 || i >= doc.sheets.length) return;
   if (i !== doc.cur) {
@@ -1768,7 +1864,7 @@ function addSheet() {
 }
 function duplicateSheet(i) {
   syncSheet(); const sh = doc.sheets[i], c = cloneSheetContent(sh.nodes, sh.edges, false);
-  doc.sheets.splice(i + 1, 0, {id:uid(), name:sh.name + ' (copy)', nodes:c.nodes, edges:c.edges});
+  doc.sheets.splice(i + 1, 0, {id:uid(), name:sh.name + ' (copy)', nodes:c.nodes, edges:c.edges, ...(sh.steps ? {steps: JSON.parse(JSON.stringify(sh.steps))} : {})});
   gotoSheet(i + 1); commit();
 }
 function deleteSheet(i) {
@@ -1896,6 +1992,10 @@ const REPORTS = {
   connections: {name:'Connection schedule', rows: () => { const out = [['Line','From','To','Position','Connection type','Family','Size']];
     for (const e of doc.edges) for (const [k, pos] of [['cFrom','Start'],['cMid','Inline'],['cTo','End']]) if (e[k] && CONNS[e[k]]) out.push([lineTag(e), endName(e, 'from'), endName(e, 'to'), pos, CONNS[e[k]].name, CONNS[e[k]].fam === 'as' ? 'Aseptic / single-use' : 'Stainless / hygienic', e[k + 'Size']]);
     return out; }},
+  steps: {name:'Component steps', rows: () => { const ss = stepsOf();
+    return [['Tag','Item','Spec / size','Steps present', ...ss.map((s, k) => `${k + 1}. ${s.name}`)],
+      ...(ss.length ? [...doc.nodes.filter(n => SYM[n.type] && SYM[n.type].text === 'below' && n.type !== 'junction').map(n => [n.tag, typeName(n) + (n.label && n.label !== SYM[n.type].label ? ' — ' + String(n.label).replace(/\n/g, ' ') : ''), n.detail, n.steps ? stepRange(n.steps) : 'All', ...ss.map(s => inStep(n, s.id) ? '●' : '')]),
+        ...doc.edges.filter(e => !LINES[e.type]?.sig).map(e => [lineTag(e), (LINES[e.type]?.name || 'Line') + ': ' + tagOf(byId(e.from.node)) + ' → ' + tagOf(byId(e.to.node)), e.tubeId ? `${e.tubeId} ID ${e.tubeMat || ''}`.trim() : e.size || '', (k => k.length === ss.length ? 'All' : stepRange(k) || 'None')(ss.filter(s => edgeVis(e, s.id)).map(s => s.id)), ...ss.map(s => edgeVis(e, s.id) ? '●' : '')])] : [])]; }},
   bom: {name:'Bill of materials (SU)', rows: () => [['Item','Qty','Description','Size / spec','Vendor','Part no.'], ...computeBOM().map((r, i) => [i + 1, r.qty, r.desc, r.detail, r.vendor, r.pn])]}
 };
 // Barb / tubing size checks: read inch (or mm) sizes from the parts of a spec that name a barb or a tubing ID
@@ -1951,6 +2051,10 @@ function runChecks() {
     }
     for (const k of ['cFrom','cMid','cTo']) if (e[k] && !e[k + 'Size'] && mode !== 'pfd') push('warn', `${CONNS[e[k]]?.name} on ${nm} has no size`, e.id);
   }
+  for (const s of stepsOf()) for (const e of doc.edges) if (e.steps && inStep(e, s.id) && !edgeVis(e, s.id)) {
+    const a = byId(e.from.node), b = byId(e.to.node), gone = [a, b].filter(x => !inStep(x, s.id)).map(x => tagOf(x) || SYM[x.type].name);
+    push('warn', `Step ${stepIdx(s.id) + 1} (${s.name}): line ${tagOf(a) || '?'} → ${tagOf(b) || '?'} is in this step but ${gone.join(' and ')} ${gone.length > 1 ? 'are' : 'is'} not`, e.id);
+  }
   if (mode === 'su') for (const r of computeBOM()) if (!r.pn) push('warn', `BOM: ${r.desc}${r.detail ? ' (' + r.detail + ')' : ''} has no part number`, r.id);
   return out;
 }
@@ -1980,6 +2084,7 @@ function allChecks() {
 function focusItem(id, sheet) {
   if (sheet !== undefined && sheet !== doc.cur) { closeModal(); gotoSheet(sheet); }
   const n = byId(id), e = edgeById(id); let c;
+  if ((n && !nodeVis(n)) || (e && !edgeVis(e))) { stepView[doc.sheets[doc.cur].id] = ''; renderTabs(); }
   if (n) c = [n.x + n.w/2, n.y + n.h/2]; else if (e) { const p = route(e); if (p) c = midpoint(p); }
   if (!c) return;
   const r = svg.getBoundingClientRect(); view.k = Math.max(view.k, 1); view.x = r.width/2 - c[0]*view.k; view.y = r.height/2 - c[1]*view.k;
@@ -2011,8 +2116,9 @@ const slug = () => (doc.title || 'pfd').toLowerCase().replace(/[^a-z0-9]+/g, '-'
 function exportSVG() {
   const b = bounds() || {x:0, y:0, w:400, h:300}, pad = 30;
   const x = Math.floor(b.x - pad), y = Math.floor(b.y - pad), W = Math.ceil(b.w + pad*2), H = Math.ceil(b.h + pad*2);
-  const L = layers(true);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${x} ${y} ${W} ${H}"><defs>${defsSVG(false)}</defs><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#ffffff"/>${L.z}${L.e}${L.n}</svg>`;
+  const L = layers(true), st = activeStep();
+  const cap = st ? T(x + 14, y + 20, `STEP ${stepIdx(st) + 1} OF ${stepsOf().length} · ${stepsOf()[stepIdx(st)].name}`, {size:12, weight:700, anchor:'start', fill:STEP_COLOR}) : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${x} ${y} ${W} ${H}"><defs>${defsSVG(false)}</defs><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#ffffff"/>${L.z}${L.e}${L.n}${cap}</svg>`;
 }
 function toPNG(svgText, scale = 2) {
   return new Promise((res, rej) => {
@@ -2069,10 +2175,20 @@ const svgForPdf = t => t.replace(/<marker id="(arrS?)-(\w+)"([^>]*?)markerWidth=
   .replace(/ stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"/g, '');
 const PAGES = {fit:['Fit to drawing'], a3:['A3', 1190.55, 841.89], tabloid:['11 × 17 (ANSI B)', 1224, 792], a4:['A4', 841.89, 595.28], letter:['Letter', 792, 612]};
 function offscreen() { const h = document.createElement('div'); h.style.cssText = 'position:fixed;left:-20000px;top:0;visibility:hidden;pointer-events:none'; document.body.appendChild(h); return h; }
-async function exportPDF(scope, page) {
+// Pages for one sheet: the combined view and/or one page per step (sheets without steps get one page)
+function sheetPages(stepMode) {
+  const ss = stepsOf(); if (!ss.length || stepMode === 'view') return [sheetSVG()];
+  const out = [], keep = forceStep;
+  try {
+    if (stepMode !== 'each') { forceStep = ''; out.push(sheetSVG()); }
+    if (stepMode !== 'combined') for (const s of ss) { forceStep = s.id; out.push(sheetSVG()); }
+  } finally { forceStep = keep; }
+  return out;
+}
+async function exportPDF(scope, page, stepMode = 'view') {
   await loadPdfLibs();
   const {jsPDF} = window.jspdf;
-  const sheets = scope === 'all' ? forEachSheet(() => sheetSVG()) : [sheetSVG()];
+  const sheets = (scope === 'all' ? forEachSheet(() => sheetPages(stepMode)) : [sheetPages(stepMode)]).flat();
   const host = offscreen(); let pdf = null;
   try {
     for (const sh of sheets) {
@@ -2260,6 +2376,7 @@ async function openExport() {
       <div class="exp-opts">
         <label>Sheets ${sel1('id="xScope"', [['all', `All sheets (${n})`], ['cur', `This sheet only (${doc.cur + 1}. ${esc(doc.sheets[doc.cur].name)})`]], n > 1 ? 'all' : 'cur')}</label>
         <label>PDF paper ${sel1('id="xPage"', Object.entries(PAGES).map(([k, v]) => [k, v[0]]), 'tabloid')}</label>
+        ${forEachSheet(() => stepsOf().length).some(Boolean) ? `<label>Steps in PDF ${sel1('id="xSteps"', [['both','Combined view + one page per step'],['each','One page per step'],['combined','Combined view only'],['view','As shown on screen']], 'both')}</label>` : ''}
       </div>
       <div class="btns"><button class="btn primary" id="xPdf">Download PDF</button><button class="btn primary" id="xDxf">Download DXF</button><span id="xMsg" class="note" style="margin:0;align-self:center"></span></div>
     </div>
@@ -2272,7 +2389,7 @@ async function openExport() {
     <p class="note"><b>PDF</b> is vector, one page per sheet, with the drawing scaled to the paper. <b>DXF</b> (AutoCAD R12) opens in AutoCAD, BricsCAD, DraftSight and LibreCAD: one file per sheet, millimetres at 1 px = 0.265 mm, layers by object type (EQUIPMENT, VALVES, INSTRUMENTS, LINE-…, SU-PARTS, TITLE…), with CAD colours and linetypes. Inside claude.ai the DXF files arrive in a .zip. The .json file reopens the diagram here for editing (Open → choose file); work also autosaves in this browser.</p>`);
   const busy = async (btn, fn) => { const t = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing…'; $('#xMsg').textContent = '';
     try { await fn(); } catch (e) { $('#xMsg').textContent = 'Export failed: ' + (e.message || e); } finally { btn.disabled = false; btn.textContent = t; } };
-  $('#xPdf').onclick = e => busy(e.currentTarget, async () => download(await exportPDF($('#xScope').value === 'all' ? 'all' : 'cur', $('#xPage').value), `${slug()}.pdf`));
+  $('#xPdf').onclick = e => busy(e.currentTarget, async () => download(await exportPDF($('#xScope').value === 'all' ? 'all' : 'cur', $('#xPage').value, $('#xSteps') ? $('#xSteps').value : 'view'), `${slug()}.pdf`));
   $('#xDxf').onclick = e => busy(e.currentTarget, () => exportDXF($('#xScope').value === 'all' ? 'all' : 'cur'));
   $('#xSvg').onclick = () => download(svgText, slug() + '.svg');
   $('#xCopySvg').onclick = e => copyText(svgText, e.currentTarget);
