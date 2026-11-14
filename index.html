@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pidgeon — free process diagrams for pharma</title>
-<meta name="description" content="Free, open-source editor for pharma PFDs, P&IDs and single-use assembly drawings. Runs in your browser; nothing is uploaded.">
+<meta name="description" content="A free, open-source editor for pharma PFDs, P&IDs and single-use flow diagrams. It runs in your browser and nothing is uploaded.">
 <link rel="icon" href="assets/pidgeon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/site.css">
 <meta property="og:title" content="Pidgeon — process diagrams for pharma">
-<meta property="og:description" content="Free, open-source editor for PFDs, P&amp;IDs and single-use assembly drawings. Runs in your browser; nothing is uploaded.">
+<meta property="og:description" content="A free, open-source editor for PFDs, P&amp;IDs and single-use flow diagrams. It runs in your browser and nothing is uploaded.">
 <meta property="og:image" content="https://pidgeon.studio/assets/app-pid.webp">
 <meta property="og:url" content="https://pidgeon.studio/">
 <link rel="canonical" href="https://pidgeon.studio/">
@@ -29,7 +29,7 @@
 <div class="hero">
   <div>
     <h1>Draw pharma process diagrams in your browser</h1>
-    <p class="lede">PFDs, P&amp;IDs and single-use assembly drawings, with the symbols, tags and lists process engineers work with. Free and open source. Nothing to install, nothing uploaded.</p>
+    <p class="lede">A free drawing tool for PFDs, P&amp;IDs and single-use flow diagrams, with pharma symbols, tags and equipment lists built in. It runs in your browser, so there is nothing to install and nothing gets uploaded.</p>
     <div class="ctas">
       <a class="btn go" href="app/">Open the editor</a>
       <a class="btn" href="app/#template-pid">Start from a P&amp;ID</a>
@@ -48,36 +48,36 @@
 
 <section aria-labelledby="kinds">
   <h2 id="kinds">One editor, three kinds of drawing</h2>
-  <p class="intro">Pick the drawing type and the palette, line styles and title block follow. Each opens below as a worked example you can edit.</p>
+  <p class="intro">Pick a drawing type and the palette, line style and title block change to suit it. Each example below opens in the editor, so you can change it or start your own from it.</p>
   <div class="kinds">
     <div class="kind">
       <figure><img src="assets/drawing-mab.svg" alt="Process flow diagram of a monoclonal antibody process, from seed expansion to frozen bulk drug substance." loading="lazy"></figure>
       <h3>Process flow diagrams</h3>
-      <p>Unit operations from seed train and harvest through chromatography, viral clearance, fill–finish and oral solid dose. Cleanroom grades, single-use badges and stream labels.</p>
+      <p>Symbols for upstream, harvest, chromatography, viral clearance, fill–finish and oral solid dose, plus cleanroom grades, single-use badges and stream labels.</p>
       <a class="open" href="app/#template-mab">Open the mAb process example</a>
     </div>
     <div class="kind">
       <figure><img src="assets/drawing-pid.svg" alt="P&amp;ID of buffer hold tank T-101." loading="lazy"></figure>
       <h3>P&amp;IDs</h3>
-      <p>ISA-5.1 instruments and control loops, hygienic valves, line tags, nozzle numbers and line jumps. Spread a system over several sheets with linked off-page connectors.</p>
+      <p>Instruments and control loops drawn the ISA-5.1 way, hygienic valves, line tags, nozzle numbers and line jumps. A system can run over several sheets, joined by off-page connectors.</p>
       <a class="open" href="app/#template-pid">Open the buffer tank P&amp;ID</a>
     </div>
     <div class="kind">
-      <figure><img src="assets/drawing-su.svg" alt="Single-use assembly drawing of a 50 litre buffer bag with tubing, aseptic connectors, clamps, a tee and a sample bag, with its bill of materials." loading="lazy"></figure>
-      <h3>Single-use assemblies</h3>
-      <p>Bags, tubing with material, ID × OD and length, aseptic connectors, clamps and fittings. The bill of materials fills itself in as you draw.</p>
+      <figure><img src="assets/drawing-su.svg" alt="Single-use flow diagram of a 50 litre buffer bag with tubing, aseptic connectors, clamps, a tee and a sample bag, with its bill of materials." loading="lazy"></figure>
+      <h3>Single-use flow diagrams</h3>
+      <p>Bags, tubing (material, ID × OD and length), aseptic connectors, clamps and fittings. The bill of materials updates as you draw, and you can mark which parts are in use at each step of the operation.</p>
       <a class="open" href="app/#template-su">Open the 50 L bag assembly</a>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="out">
-  <h2 id="out">The lists come out of the drawing</h2>
-  <p class="intro">Every tag, line number and connector you draw is data. Export the drawing for review, or the lists for your spreadsheet.</p>
+  <h2 id="out">Lists come straight from the drawing</h2>
+  <p class="intro">Tags, line numbers and connectors are stored with the drawing, so you can export the lists without retyping them.</p>
   <table class="outputs">
     <tr><th scope="row">PDF</th><td><p>Vector, one page per sheet, on A3, A4, 11 × 17 or Letter, or sized to the drawing.</p></td></tr>
-    <tr><th scope="row">DXF</th><td><p>Opens in AutoCAD, BricsCAD, DraftSight and LibreCAD. One file per sheet, in millimetres, with layers for equipment, valves, instruments, each line type and the title block.</p></td></tr>
-    <tr><th scope="row">CSV lists</th><td><p>Equipment list, line list, instrument index, valve list, connection schedule and single-use bill of materials. They open in Excel.</p></td></tr>
+    <tr><th scope="row">DXF</th><td><p>AutoCAD R12 DXF, an old format that most CAD programs can read. One file per sheet, in millimetres, with layers for equipment, valves, instruments, each line type and the title block. If a file won’t open in your CAD program, please <a href="https://github.com/MinaryBytes/Pidgeon/issues">report it</a>.</p></td></tr>
+    <tr><th scope="row">CSV lists</th><td><p>Equipment list, line list, instrument index, valve list, connection schedule, component steps and single-use bill of materials, as CSV files for Excel or any spreadsheet.</p></td></tr>
     <tr><th scope="row">Drawing check</th><td><p>Finds duplicate tags, valves connected on one side only, lines missing size or pipe class, tubing without a length, and off-page connectors that lead nowhere.</p></td></tr>
     <tr><th scope="row">PNG, SVG, JSON</th><td><p>Images for slides and SOPs, and the editable drawing file to share or reopen later.</p></td></tr>
   </table>
@@ -90,7 +90,7 @@
     </div>
     <div>
       <p>Pidgeon is a single web page that runs in your browser. There is no server behind it, no account, no analytics and no cookies. Drawings are kept in your browser's storage and in the files you save yourself.</p>
-      <p>That makes it usable for confidential process designs, and it keeps working without a network once the page has loaded. You can also download the source and open <code>app/index.html</code> straight from your own drive.</p>
+      <p>Nothing you draw is sent anywhere. Even so, check your company’s rules before using any outside tool for confidential work. If you prefer, you can download the source and open <code>app/index.html</code> from your own drive.</p>
     </div>
   </div>
 </section>
@@ -99,17 +99,17 @@
   <div class="split">
     <div>
       <h2 id="conv">Conventions you can change</h2>
-      <p>Defaults follow common industry practice so a new drawing reads correctly. Sites with their own standard can replace the code lists in one place.</p>
+      <p>The defaults are neutral placeholders based on common conventions, not any particular company’s standard. If your site has its own, the code lists are all in one place in the source.</p>
     </div>
     <ul>
-      <li>Instrument symbols and tags per ISA-5.1, for example <code>FIC 104</code>, with location and control-system shapes.</li>
+      <li>Instrument bubbles and tags in the style of ISA-5.1, for example <code>FIC 104</code>, with location and control-system shapes.</li>
       <li>Line tags as size, service, number, pipe class and insulation, for example <code>1.5"-WFI-1001-SS-BPE-SF4</code>.</li>
       <li>Hygienic pipe classes and surface finishes in the style of ASME BPE, plus single-use tubing classes.</li>
       <li>Cleanroom zones by EU GMP Annex 1 grade, A to D and CNC.</li>
       <li>Stainless and aseptic connection markers, with sizes, from Tri-Clamp to steam-through connectors.</li>
     </ul>
   </div>
-  <p class="note" style="margin-top:36px"><strong>Not validated software.</strong> Use Pidgeon for concept work, design reviews and mark-ups. Drawings that support GMP decisions should be issued through your controlled document system; DXF export is there to make that hand-off easy.</p>
+  <p class="note" style="margin-top:36px"><strong>Not validated software.</strong> Use Pidgeon for concept work, design reviews and mark-ups. Drawings that support GMP decisions should be issued through your controlled document system. DXF export can help with that hand-off.</p>
 </section>
 
 <section aria-labelledby="about">
@@ -126,8 +126,8 @@
 <section aria-labelledby="faq">
   <h2 id="faq" style="margin-bottom:22px">Questions</h2>
   <details><summary>Is it really free?</summary><p>Yes. Pidgeon is open source under the MIT licence: use it, change it and share it, including at work and in commercial projects.</p></details>
-  <details><summary>Can I use it for company drawings?</summary><p>Nothing you draw leaves your computer, so it is suitable for confidential designs. Check your company's rules on browser-based tools; because it is a static page, IT teams can also host their own copy internally.</p></details>
-  <details><summary>How do I get a drawing into AutoCAD or Visio?</summary><p>Use Save &amp; export. DXF opens in AutoCAD and other CAD tools with layers and linetypes. SVG pastes into Visio, PowerPoint and Word.</p></details>
+  <details><summary>Can I use it for company drawings?</summary><p>Nothing you draw leaves your computer, but whether you may use it for company work is your company’s call, so check their rules on outside tools first. Because Pidgeon is a static page, an IT team can also host its own copy internally.</p></details>
+  <details><summary>How do I get a drawing into AutoCAD or Visio?</summary><p>Use Save &amp; export. For CAD, choose DXF, which keeps layers and linetypes. For Visio, PowerPoint or Word, choose SVG and insert it as a picture.</p></details>
   <details><summary>Can it use our site's tag standard or symbols?</summary><p>The service codes, pipe classes and tag prefixes are short lists at the top of the code. Fork the project and change them, or open an issue describing your standard.</p></details>
   <details><summary>Where is my work saved?</summary><p>In this browser on this computer, automatically. To move a drawing to another computer or share it, use Save &amp; export and choose the diagram file (.json), then Open it on the other machine.</p></details>
   <details><summary>How do I report a problem or ask for a symbol?</summary><p>Open an issue on <a href="https://github.com/MinaryBytes/Pidgeon/issues">GitHub</a>. Attach the .json file if a drawing shows the problem, after removing anything confidential.</p></details>

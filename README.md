@@ -1,6 +1,6 @@
 # Pidgeon
 
-**Free, open-source editor for pharma process diagrams: PFDs, P&IDs and single-use assembly drawings. Runs entirely in your browser.**
+**A free, open-source editor for pharma process diagrams: PFDs, P&IDs and single-use flow diagrams. It runs in your browser.**
 
 [Open the editor](https://pidgeon.studio/app/) · [Website](https://pidgeon.studio/) · [Guide](https://pidgeon.studio/guide.html)
 
@@ -10,9 +10,10 @@
 
 - **Process flow diagrams** with symbols for upstream, harvest, purification, fill–finish and oral solid dose; cleanroom zones by EU GMP Annex 1 grade; single-use badges.
 - **P&IDs** with ISA-5.1 instruments and loops, hygienic valves, line tags (`size-service-number-class-insulation`), nozzle numbers, line jumps, and multi-sheet drawings with linked off-page connectors.
-- **Single-use assembly drawings** with tubing material / ID × OD / length, aseptic connectors, clamps and fittings, assembly boundaries and an automatic bill of materials.
-- **Exports:** vector PDF (one page per sheet), DXF R12 for CAD (one file per sheet, layered), PNG/SVG, and the editable JSON drawing.
-- **Lists:** equipment list, line list, instrument index, valve list, connection schedule and BOM as CSV, plus a drawing check.
+- **Single-use flow diagrams** with tubing material / ID × OD / length, aseptic connectors, clamps and fittings, assembly boundaries, a bill of materials with part numbers, and steps to show which parts are in use when.
+- **Layers** to keep, for example, P&ID and single-use content in one drawing and show either.
+- **Exports:** vector PDF (one page per sheet, or per layer or step), DXF R12 for CAD (one file per sheet, layered; checked with ezdxf), PNG/SVG, and the editable JSON drawing.
+- **Lists:** equipment list, line list, instrument index, valve list, connection schedule, component steps and BOM as CSV, plus a drawing check.
 
 ## Privacy
 

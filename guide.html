@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guide — Pidgeon</title>
-<meta name="description" content="How to draw, check and export PFDs, P&IDs and single-use assembly drawings with Pidgeon.">
+<meta name="description" content="How to draw, check and export PFDs, P&IDs and single-use flow diagrams with Pidgeon.">
 <link rel="icon" href="assets/pidgeon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/site.css">
 <meta property="og:title" content="Pidgeon — process diagrams for pharma">
-<meta property="og:description" content="Free, open-source editor for PFDs, P&amp;IDs and single-use assembly drawings. Runs in your browser; nothing is uploaded.">
+<meta property="og:description" content="A free, open-source editor for PFDs, P&amp;IDs and single-use flow diagrams. It runs in your browser and nothing is uploaded.">
 <meta property="og:image" content="https://pidgeon.studio/assets/app-pid.webp">
 <link rel="canonical" href="https://pidgeon.studio/guide.html">
 </head>
@@ -30,7 +30,7 @@
   <a href="#draw">Drawing basics</a>
   <a href="#pfd">Process flow diagrams</a>
   <a href="#pid">P&amp;IDs</a>
-  <a href="#su">Single-use assemblies</a>
+  <a href="#su">Single-use flow diagrams</a>
   <a href="#layers">Layers</a>
   <a href="#steps">Steps</a>
   <a href="#sheets">Sheets</a>
@@ -41,7 +41,7 @@
 </nav>
 <article>
 <h1>Pidgeon guide</h1>
-<p class="lede">Everything you need to draw, check and export a diagram. Ten minutes, start to finish.</p>
+<p class="lede">How to draw, check and export a diagram in Pidgeon.</p>
 
 <h2 id="start">Getting started</h2>
 <ol>
@@ -66,13 +66,13 @@
 
 <h2 id="pid">P&amp;IDs</h2>
 <h3>Instruments</h3>
-<p>Type the tag as letters and loop number, for example <code>PIT 201</code>. In the panel, choose where the function is implemented (discrete, DCS, computer or PLC) and where it is accessed (field, control room, local panel, behind panel); the symbol changes to match ISA-5.1. Control and on/off valves carry a fail position.</p>
+<p>Type the tag as letters and loop number, for example <code>PIT 201</code>. In the panel, choose where the function is implemented (discrete, DCS, computer or PLC) and where it is accessed (field, control room, local panel, behind panel); the symbol changes to show it, following ISA-5.1 conventions. Control and on/off valves carry a fail position.</p>
 <h3>Lines</h3>
 <p>Select a line to fill in size, service, line number, pipe class and insulation. The tag, such as <code>1.5"-WFI-1001-SS-BPE-SF4</code>, appears once per line number when <b>Tags</b> is on. <b>Auto-number line</b> gives the next free number. Nozzle IDs (N1, N2…) go on each end.</p>
 <h3>Equipment</h3>
 <p>Volume, material, design pressure and temperature are under <b>Equipment design data</b>, and appear on the drawing if you choose to show them.</p>
 
-<h2 id="su">Single-use assemblies</h2>
+<h2 id="su">Single-use flow diagrams</h2>
 <p>Draw the assembly with bags, fittings, clamps and connectors, then select each tubing run to enter material, ID, OD and length. Place an <b>Assembly boundary</b> around the parts with its part number and sterilization method, and add a <b>Bill of materials</b>: it counts everything inside the boundary, groups connectors by size and totals tubing length by material and size.</p>
 
 <h2 id="layers">Layers</h2>
@@ -89,7 +89,7 @@
 <table>
   <tr><th>PDF</th><td>Vector, one page per sheet. Choose A3, A4, 11 × 17, Letter or fit to drawing.</td></tr>
   <tr><th>DXF</th><td>AutoCAD R12, one file per sheet, millimetres (1 px = 0.265 mm). Layers by object type, CAD colours and linetypes.</td></tr>
-  <tr><th>PNG / SVG</th><td>The current sheet as an image. SVG pastes into Visio, PowerPoint and Word.</td></tr>
+  <tr><th>PNG / SVG</th><td>The current sheet as an image. Insert an SVG into Visio, PowerPoint or Word as a picture.</td></tr>
   <tr><th>JSON</th><td>The editable drawing, all sheets. Reopen it with <b>Open</b>.</td></tr>
 </table>
 
