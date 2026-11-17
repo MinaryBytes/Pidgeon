@@ -1118,16 +1118,6 @@ function edgeSVG(e, exp, H, pts, tagText = '') {
     const m = midpoint(pts), tw = e.label.length * 6.1 + 12;
     o += `<rect x="${m[0]-tw/2}" y="${m[1]-9}" width="${tw}" height="18" rx="3" fill="#fff" stroke="${L.color}" stroke-width=".8"/>` + T(m[0], m[1]+4, e.label, {size:10, weight:500, fill:L.color === INK ? INK : L.color});
   }
-  if (isSel && sel.size === 1 && !exp) {
-    const a = pts[0], b = pts[pts.length-1];
-    const ep = editRoute(e);
-    for (let j = 1; j < ep.length - 2; j++) {
-      const P = ep[j], Q = ep[j + 1], len = Math.hypot(Q[0] - P[0], Q[1] - P[1]); if (len < 14) continue;
-      const horiz = Math.abs(P[1] - Q[1]) < .5, mx = (P[0] + Q[0]) / 2, my = (P[1] + Q[1]) / 2;
-      o += `<rect class="seg ${horiz ? 'h' : 'v'}" data-seg="${e.id}:${j}" x="${mx - (horiz ? 9 : 3.5)}" y="${my - (horiz ? 3.5 : 9)}" width="${horiz ? 18 : 7}" height="${horiz ? 7 : 18}" rx="3.5"/>`;
-    }
-    o += `<circle class="eend" data-eend="${e.id}:from" cx="${a[0]}" cy="${a[1]}" r="5"/><circle class="eend" data-eend="${e.id}:to" cx="${b[0]}" cy="${b[1]}" r="5"/>`;
-  }
   return o + '</g>';
 }
 function longestRun(pts) {
@@ -1279,6 +1269,23 @@ function tidyUp() {
   commit(); renderProps(); toast(sel.size ? 'Tidied the selection' : 'Tidied the drawing');
 }
 
+// Handles for the selected line: drawn in the overlay, above the shapes, so the ends can be grabbed
+// even though they sit on a shape's connection point
+function edgeHandlesSVG() {
+  if (sel.size !== 1 || drag) return '';
+  const e = edgeById([...sel][0]); if (!e || !edgeVis(e)) return '';
+  const pts = route(e); if (!pts) return '';
+  const a = pts[0], b = pts[pts.length - 1];
+  let o = '';
+  const ep = editRoute(e);
+  for (let j = 1; j < ep.length - 2; j++) {
+    const P = ep[j], Q = ep[j + 1], len = Math.hypot(Q[0] - P[0], Q[1] - P[1]); if (len < 14) continue;
+    const horiz = Math.abs(P[1] - Q[1]) < .5, mx = (P[0] + Q[0]) / 2, my = (P[1] + Q[1]) / 2;
+    o += `<rect class="seg ${horiz ? 'h' : 'v'}" data-seg="${e.id}:${j}" x="${mx - (horiz ? 9 : 3.5)}" y="${my - (horiz ? 3.5 : 9)}" width="${horiz ? 18 : 7}" height="${horiz ? 7 : 18}" rx="3.5"/>`;
+  }
+  o += `<circle class="eend" data-eend="${e.id}:from" cx="${a[0]}" cy="${a[1]}" r="6.5"/><circle class="eend" data-eend="${e.id}:to" cx="${b[0]}" cy="${b[1]}" r="6.5"/>`;
+  return o;
+}
 function overlaySVG() {
   if (!drag) return '';
   if (drag.mode === 'move' && drag.guides && drag.guides.length && !drag.target) return guidesSVG(drag.guides);
@@ -1302,7 +1309,7 @@ function overlaySVG() {
 }
 function render() {
   const L = layers(false);
-  $('#Lz').innerHTML = L.z; $('#Le').innerHTML = L.e; $('#Ln').innerHTML = L.n; $('#Lo').innerHTML = overlaySVG();
+  $('#Lz').innerHTML = L.z; $('#Le').innerHTML = L.e; $('#Ln').innerHTML = L.n; $('#Lo').innerHTML = overlaySVG() + edgeHandlesSVG();
   $('#world').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
   const gp = document.getElementById('grid');
   if (gp) gp.setAttribute('patternTransform', `translate(${view.x},${view.y}) scale(${view.k})`);
@@ -1636,7 +1643,13 @@ function endDrag(ev) {
     }
     if (d.moved) commit(); else if (d.clickSelect) { sel = new Set([d.clickSelect]); render(); renderProps(); } }
   else if (d.mode === 'resize') commit();
-  else if (d.mode === 'seg') { if (d.moved) { const e = edgeById(d.id); const r = route(e); e.via = r && r.length > 4 ? viaFrom(e, r) : undefined; if (!e.via || !e.via.length) delete e.via; commit(); renderProps(); } }
+  else if (d.mode === 'seg') { if (d.moved) {
+    const e = edgeById(d.id), r = route(e), A = byId(e.from.node), B = byId(e.to.node);
+    const auto = orth(portPos(A, e.from.port), e.from.port, portPos(B, e.to.port), e.to.port);
+    // keep the bends unless the drag happened to land back on the automatic route
+    if (r && JSON.stringify(r) !== JSON.stringify(auto)) e.via = viaFrom(e, r); else delete e.via;
+    if (e.via && !e.via.length) delete e.via;
+    commit(); renderProps(); } }
   else if (d.mode === 'connect') {
     const t = nodeAt(d.cur.x, d.cur.y, d.from.node);
     if (t) {
