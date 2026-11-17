@@ -1520,6 +1520,9 @@ function zoomAt(f, cx, cy) {
 svg.addEventListener('pointerdown', ev => {
   hideEditor(true);
   ev.preventDefault(); // keeps focus (and the inline editor) from being stolen by the canvas
+  // ...but a search box or panel field that still has focus would swallow Delete and the other shortcuts
+  const ae = document.activeElement;
+  if (ae && ae !== ed && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) ae.blur();
   const w = toWorld(ev.clientX, ev.clientY), t = ev.target;
   if (ev.button === 1 || ev.button === 2 || (ev.button === 0 && spaceDown)) {
     drag = {mode:'pan', sx:ev.clientX, sy:ev.clientY, vx:view.x, vy:view.y};
