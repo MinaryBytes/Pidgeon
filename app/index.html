@@ -83,6 +83,8 @@ header select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;bac
 .tab .tmenu:hover{color:var(--ink)}
 .tab-add{border:1px dashed #cbd5e1;background:transparent;border-radius:7px 7px 0 0;padding:4px 10px 5px;cursor:pointer;color:var(--muted);font-size:13px}
 .tab-add:hover{color:var(--accent);border-color:var(--accent)}
+#legal{position:absolute;left:10px;bottom:40px;max-width:calc(100% - 20px);font-size:10.5px;color:var(--muted);background:rgba(255,255,255,.8);padding:2px 7px;border-radius:5px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#status{bottom:64px!important}#legal a{color:inherit;pointer-events:auto}
+@media (max-width:900px){#legal{display:none}}
 #status{position:absolute;right:10px;bottom:40px;font-size:11px;color:var(--muted);background:rgba(255,255,255,.85);padding:3px 8px;border-radius:5px;pointer-events:none}
 #editor{position:absolute;display:none;z-index:20;width:180px;min-height:28px;padding:4px 6px;border:1.5px solid var(--sel);border-radius:5px;font-size:12px;text-align:center;resize:none;outline:none;box-shadow:0 4px 14px rgba(0,0,0,.12)}
 /* props */
@@ -201,6 +203,7 @@ table.keys td:first-child{white-space:nowrap;width:44%}
     <textarea id="editor" rows="1"></textarea>
     <div id="tabs"></div>
     <div id="status"></div>
+    <div id="legal">© 2026 MinaryBytes and Pidgeon contributors · <a href="https://pidgeon.studio/LICENSE" target="_blank" rel="noopener">MIT License</a> · provided as is, without warranty</div>
   </main>
 
   <aside id="props"></aside>
@@ -2927,7 +2930,7 @@ function openTemplates(isNew) {
 }
 function openHelp() {
   const rows = [['Drag symbol → canvas','Add shape'],['Drop valve / fitting on a line','Insert it inline (splits the line)'],['R','Rotate 90°'],['Drag from blue port','Connect two shapes'],['Drag a handle on a selected line','Reshape the line (Reset in the panel undoes it)'],['Double-click / Enter','Edit label'],['Drag empty canvas','Box-select'],['Shift + click','Add to selection'],['Right-drag (or Space + drag)','Pan'],['Scroll / pinch','Zoom'],['Shift + scroll','Pan sideways'],['Shift + T','Tidy up (selection or whole sheet)'],['Alt while dragging','Ignore smart guides'],['F','Fit diagram to screen'],['Delete','Delete selection'],['Ctrl + C / V / D','Copy / paste / duplicate'],['Ctrl + Z / Y','Undo / redo'],['Arrow keys (+Shift)','Nudge 10 px (50 px)'],['Ctrl + S','Save & export']];
-  openModal('Keyboard & mouse', `<table class="keys">${rows.map(([a,b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table><p class="note">Line types follow common PFD conventions: solid = process stream, solid cyan = single-use tubing (closed SU flowpath), dashed blue = utility, dash-dot teal = CIP/SIP, long-dash purple = manual or mobile-vessel transfer, brown = waste, dotted grey = control signal. Cleanroom zones use EU GMP Annex 1 grades.</p><p class="note"><b>Pidgeon</b> is created by Minhazuddin Mohammed (MinaryBytes) and is free and open source under the MIT licence. It runs entirely in your browser: drawings are stored on this device and in the files you save, never uploaded. It is not validated for GMP use — treat drawings as drafts until issued through your controlled document system. Source code and issues: <a href="${REPO_URL}" target="_blank" rel="noopener">${REPO_URL.replace('https://', '')}</a></p>`);
+  openModal('Keyboard & mouse', `<table class="keys">${rows.map(([a,b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table><p class="note">Line types follow common PFD conventions: solid = process stream, solid cyan = single-use tubing (closed SU flowpath), dashed blue = utility, dash-dot teal = CIP/SIP, long-dash purple = manual or mobile-vessel transfer, brown = waste, dotted grey = control signal. Cleanroom zones use EU GMP Annex 1 grades.</p><p class="note"><b>Pidgeon</b> is created by Minhazuddin Mohammed (MinaryBytes) and is free and open source under the MIT licence. It runs entirely in your browser: drawings are stored on this device and in the files you save, never uploaded. It is not validated for GMP use — treat drawings as drafts until issued through your controlled document system. Source code and issues: <a href="${REPO_URL}" target="_blank" rel="noopener">${REPO_URL.replace('https://', '')}</a></p><p class="note">© 2026 MinaryBytes and Pidgeon contributors. Released under the MIT License: you may use, copy, modify and distribute Pidgeon, provided the copyright and licence notice are kept. The software is provided “as is”, without warranty of any kind. Pidgeon claims no rights in the drawings you make with it.</p>`);
 }
 
 /* ---------- Toolbar wiring ---------- */
