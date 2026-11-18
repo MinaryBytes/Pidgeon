@@ -10,3 +10,7 @@ Pidgeon is released under the MIT licence (see `LICENSE`). It bundles the follow
 | [Barlow and Barlow Condensed](https://github.com/jpt/barlow) | Website typeface | SIL Open Font License 1.1 | `licenses/Barlow-OFL.txt` |
 
 Industry standards referred to (ISA-5.1, ASME BPE, EU GMP Annex 1) are named for orientation only. Pidgeon is not affiliated with or endorsed by ISA, ASME, the European Commission, or any company named in its documentation.
+
+## Reporting a rights concern
+
+Pidgeon is meant to use only original or openly licensed material. If you believe something in this project belongs to you or someone else and is used without permission, please [open an issue on GitHub](https://github.com/MinaryBytes/Pidgeon/issues/new) and I'll look into it promptly.
